@@ -1,15 +1,17 @@
 # Technical Decisions
 
-Format: decision → alternatives considered → rationale. Status: **Accepted** unless marked **Proposed** (to be confirmed in Phase 2).
+Format: decision → alternatives considered → rationale. All decisions are **Accepted** (Phase 1 review, 2026-11-08).
+
+**Version policy (review decision):** use the long-established stable major of each dependency, not the newest. A major that is less than ~12 months old is skipped in favour of the previous one; security advisories override this (a patched version is always preferred). Chosen: Node 22 LTS, TypeScript 5.9, Express 5, Prisma 6.19, Zod 4, Vitest 4, pino 9, ESLint 9, Next.js 15, React 19, Tailwind CSS 4, PostgreSQL 16. Exception: nodemailer 10.x (all earlier majors have open high-severity advisories).
 
 ## TD-01 Modular monolith, two independent packages
 - **Decision:** One Express API organised by domain modules + one Next.js app; separate `package.json`s, no monorepo tooling.
 - **Alternatives:** microservices; Next.js API routes as the backend; npm/pnpm workspaces.
 - **Why:** Transactions spanning orders/inventory/payments need one database transaction — microservices would add sagas for no benefit. A separate Express API matches the required stack and keeps the API reusable. No shared runtime code exists, so workspaces add tooling without payoff.
 
-## TD-02 Prisma 7.10 with the `prisma-client` generator and `@prisma/adapter-pg`
-- **Decision:** Prisma 7.10.1 (latest stable; npm's `latest` tag currently points at an 8.0 RC, which is not used). Connection URL lives in `prisma.config.ts`; runtime uses the pg driver adapter.
-- **Why:** Required by the stack; v7 is the supported line. Prisma cannot express CHECK constraints, triggers or row locks → see TD-15 and TD-08.
+## TD-02 Prisma 6.19 (`prisma-client-js` generator)
+- **Decision:** Prisma 6.19.3 — the long-established line (Prisma 7 is < 1 year old and changes the client/driver model). `deepmerge-ts` is pinned to ^8 via npm `overrides` to clear a CLI-config advisory.
+- **Why:** Required by the stack. Prisma cannot express CHECK constraints, triggers or row locks → see TD-15 and TD-08. The same schema and migration were verified under 7.10 and 6.19 (no drift).
 
 ## TD-03 UUIDv7 primary keys
 - **Alternatives:** serial/identity integers; UUIDv4.
@@ -23,13 +25,14 @@ Format: decision → alternatives considered → rationale. Status: **Accepted**
 - **Decision:** `numeric(14,2)` amounts, `numeric(14,4)` costs, `numeric(7,4)` rates; integer quantities. API serialises money as strings; backend uses `Prisma.Decimal` (decimal.js).
 - **Why:** No float rounding errors; integer stock avoids fractional drift and keeps CHECK constraints exact. Fractional quantities are a documented exclusion (A6).
 
-## TD-06 Auth: in-memory access JWT + rotating HttpOnly refresh cookie, same-origin via Next.js rewrite
-- **Alternatives:** session cookies + server session store; both tokens in cookies; tokens in localStorage.
-- **Why:** localStorage is XSS-exposed. A server session store is fine but the brief asks for access/refresh tokens with rotation. Proxying `/api` through the Next.js origin makes the refresh cookie first-party with `SameSite=Strict`, so no cross-site cookie or permissive CORS is needed. Rotation uses token families with reuse detection and a 10-second grace window so two tabs refreshing simultaneously do not log the user out. User status/permissions are re-read per request (TD-07 trade-off: one indexed query).
+## TD-06 Auth: stateless token API + Next.js server holding tokens in HttpOnly cookies (BFF)
+- **Decision:** The Express API is transport-agnostic: login/refresh return the access JWT (15 min) and an opaque refresh token in the JSON body; protected endpoints take `Authorization: Bearer`. The Next.js server (Server Components, Server Actions, Route Handlers, middleware) is the only browser-facing client: it stores both tokens in `HttpOnly; Secure; SameSite=Lax` cookies on its own origin, attaches the bearer token to server-side `fetch` calls, and refreshes in middleware when the access token expires.
+- **Alternatives:** in-memory access token in the browser (requires client-side fetching); backend-set cookies (cross-origin cookie handling); tokens in localStorage (XSS-exposed).
+- **Why:** Follows the review decision to use Next.js native server-side fetching — tokens must be readable by the Next server, never by browser JS. CSRF is covered by `SameSite` cookies plus Next.js Server Actions' built-in origin check. Rotation uses token families with reuse detection and a 10-second grace window (parallel server requests refreshing at once). User status/permissions are re-read per request (one indexed query).
 
-## TD-07 Argon2id for password hashing
-- **Alternatives:** bcrypt, scrypt.
-- **Why:** OWASP's first recommendation; memory-hard. `argon2` ships prebuilt binaries for Linux/Alpine and Windows.
+## TD-07 bcrypt for password hashing
+- **Decision:** `bcrypt` (native, prebuilt binaries), cost factor 12 (4 in tests). Passwords are limited to 72 bytes (bcrypt's input limit) by validation, so no input is silently truncated.
+- **Why:** Review decision; bcrypt is the long-established, widely audited choice.
 
 ## TD-08 Stock control: deduct at confirmation with pessimistic row locks
 - **Alternatives:** reservation at draft time; optimistic concurrency (`version` column + retry); `SERIALIZABLE` isolation; single atomic `UPDATE … WHERE stock >= qty`.
@@ -64,13 +67,13 @@ Format: decision → alternatives considered → rationale. Status: **Accepted**
 - **Decision:** CHECK constraints, append-only triggers and `pg_trgm` live in `prisma/sql/constraints.sql`, appended to the initial migration. Verified: Prisma's diff reports no drift after they are applied, so later migrations will not drop them.
 - **Why:** Integrity cannot depend only on application code. Tested in Phase 1 with 22 negative cases against PostgreSQL 15.
 
-## TD-16 Frontend data layer: client components + TanStack Query, react-hook-form + Zod, shadcn/ui
-- **Alternatives:** Server Components + server actions with server-held tokens; SWR; Formik.
-- **Why:** Authenticated back-office app with no SEO needs; TanStack Query gives caching, invalidation and loading/error states with little code; RHF + Zod is the shadcn Form standard. Additional deps: `@tanstack/react-query`, `react-hook-form`, `@hookform/resolvers`, `sonner` (toasts), `recharts` (shadcn charts), `lucide-react`.
+## TD-16 Frontend data layer: Next.js native data fetching, no client data library
+- **Decision:** Server Components fetch from the API with `fetch` (no caching for authenticated data — `cache: 'no-store'`); mutations are Server Actions followed by `revalidatePath`/`redirect`; list state (page, search, sort, filters) lives in URL search params; loading/error states via `loading.tsx` / `error.tsx` and `useActionState` / `useFormStatus`; local UI state with React `useState`/`useReducer`. No TanStack Query, SWR or global state library.
+- **Why:** Review decision; the URL-as-state + server-rendering model covers this app's needs with fewer dependencies. Forms use shadcn/ui components with Zod validation shared between the client (instant feedback) and the Server Action. Planned extra deps: `sonner` (toasts), `lucide-react`, `recharts` (dashboard chart) — all part of the shadcn ecosystem.
 
-## TD-17 OpenAPI from Zod schemas — **Proposed**
-- **Decision:** Generate `docs/api/openapi.yaml` from the route table + Zod schemas (`@asteasolutions/zod-to-openapi`, if its Zod 4 support is stable at implementation time; otherwise a hand-written spec plus a contract test that every route is documented). Swagger UI via `swagger-ui-express`. CI fails if the committed spec is stale.
-- **Why:** Keeps docs synchronised with validation by construction.
+## TD-17 Hand-written OpenAPI spec
+- **Decision:** `docs/api/openapi.yaml` (OpenAPI 3.0) is written by hand alongside each module and served with `swagger-ui-express` at `/api/docs`. An integration test compares the Express route table with the spec's paths so an undocumented route fails CI.
+- **Why:** Review decision — simple, no generator dependency; the route test prevents drift.
 
 ## TD-18 Logging with pino
 - **Why:** Fast structured JSON, built-in redaction, `pino-http` request logging.
@@ -89,8 +92,13 @@ Format: decision → alternatives considered → rationale. Status: **Accepted**
 - **Decision:** `scripts/erd/generate-erd.mjs` parses the schema and writes `docs/diagrams/ERD.drawio` (5 pages); positions live in `scripts/erd/layout.mjs`. Export with the headless draw.io Docker image (procedure in `docs/diagrams/README.md`).
 - **Why:** Keeps the ERD consistent with schema/migrations mechanically; the output is native draw.io XML (table shapes, crow's foot edges) and remains hand-editable.
 
-## TD-23 TypeScript version — **Proposed**
-- TypeScript 7.0 (native compiler) is the current `latest`. Phase 2 will use it only if `typescript-eslint`, Prisma's generated client and Next.js support it cleanly; otherwise pin the latest 5.x/6.x line. Decision recorded here once verified.
+## TD-23 TypeScript 5.9
+- **Decision:** TypeScript 5.9.3, CommonJS output for the backend (`module: NodeNext`), strict mode with `noUncheckedIndexedAccess`.
+- **Why:** Review decision — 5.x is the long-established line supported by every tool in the stack; 6.0/7.0 are recent.
 
 ## TD-24 In-memory rate limiting
 - **Why:** Single instance. If scaled horizontally, switch `express-rate-limit` to a shared store (PostgreSQL or Redis) — noted in DEPLOYMENT.
+
+## TD-25 Custom list query builder
+- **Decision:** One reusable helper (`src/common/query`) turns validated query params (`page`, `pageSize`, `search`, `sort`, typed filters) into Prisma `where` / `orderBy` / `skip` / `take` plus pagination metadata. Each module declares its searchable fields, sortable fields (whitelist) and filter mappers.
+- **Why:** Review decision; consistent pagination/search/sort/filter behaviour across all list endpoints without repeating code, and sort fields can never be injected.

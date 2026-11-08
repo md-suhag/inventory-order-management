@@ -37,7 +37,7 @@ Manager ─► Stock adjustment (reason required) ─► ADJUSTMENT_IN / ADJUSTM
 
 ## Technology
 
-Backend: Node.js, Express, TypeScript, PostgreSQL, Prisma ORM, Zod. Frontend: Next.js (App Router), React, TypeScript, Tailwind CSS, shadcn/ui. Testing: Vitest, Supertest, Playwright. Tooling: Docker / Docker Compose, GitHub Actions, OpenAPI 3 + Swagger UI. See [../architecture/SYSTEM_ARCHITECTURE.md](../architecture/SYSTEM_ARCHITECTURE.md).
+Backend: Node.js 22, Express 5, TypeScript 5.9, PostgreSQL 16, Prisma 6, Zod 4, bcrypt. Frontend: Next.js (App Router), React, TypeScript, Tailwind CSS, shadcn/ui. Testing: Vitest, Supertest, Playwright. Tooling: Docker / Docker Compose, GitHub Actions, OpenAPI 3 + Swagger UI. See [../architecture/SYSTEM_ARCHITECTURE.md](../architecture/SYSTEM_ARCHITECTURE.md).
 
 ## Milestones
 

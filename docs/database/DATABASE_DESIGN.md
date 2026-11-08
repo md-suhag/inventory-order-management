@@ -1,6 +1,6 @@
 # Database Design
 
-**Engine:** PostgreSQL 15+ · **ORM:** Prisma 7.10 · **Source of truth:** [`backend/prisma/schema.prisma`](../../backend/prisma/schema.prisma) + [`backend/prisma/sql/constraints.sql`](../../backend/prisma/sql/constraints.sql) · **Initial migration:** `backend/prisma/migrations/20261108000000_init/migration.sql`
+**Engine:** PostgreSQL 16 (constraints verified on 15 and 16) · **ORM:** Prisma 6.19 · **Source of truth:** [`backend/prisma/schema.prisma`](../../backend/prisma/schema.prisma) + [`backend/prisma/sql/constraints.sql`](../../backend/prisma/sql/constraints.sql) · **Initial migration:** `backend/prisma/migrations/20261108000000_init/migration.sql`
 
 **ERD (draw.io, editable):** [`docs/diagrams/ERD.drawio`](../diagrams/ERD.drawio) — pages: 0 Overview · 1 Core & users · 2 Products, suppliers & purchasing · 3 Orders, payments & returns · 4 Inventory & audit. Exports: `ERD.svg` / `ERD.png` (overview) and `ERD-<page>.svg|png` per detail page.
 
@@ -199,3 +199,4 @@ Permissions catalogue, 3 system roles with default grants, an initial admin (cre
 | 2026-11-08 | Initial migration applied to PostgreSQL 15 | 25 tables, 43 FKs, 58 CHECKs, 5 triggers, 106 indexes |
 | 2026-11-08 | 22 negative constraint tests (negative stock, SKU normalisation, singleton, total formula, refund > paid, movement arithmetic/sign/reference/reason, duplicate SALE, append-only update/delete, payment target/amount/reversal link, double reversal, FK restrict, invoice ⇔ confirmed) | all rejected as expected |
 | 2026-11-08 | `prisma migrate diff` DB → schema after custom SQL | empty (no drift; Prisma won't drop custom objects) |
+| 2026-11-08 | Switched to Prisma 6.19.3 (review decision); migration applied to PostgreSQL 16 via `prisma migrate deploy`; drift check | empty |

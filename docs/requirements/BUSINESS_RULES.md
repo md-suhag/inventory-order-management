@@ -183,7 +183,7 @@ balance_due     = effective_total − net_paid     (negative = money owed back)
 - **BR-IDEM-01** `Idempotency-Key` (client-generated UUID) is **required** for: goods receipt, payment/refund/reversal, stock adjustment, return request. Stored on the created row (unique). Same key + same payload → original response replayed (`Idempotent-Replayed: true`); same key + different payload → `422 IDEMPOTENCY_KEY_REUSED`.
 - **BR-IDEM-02** Confirm / complete / cancel / process-return are idempotent by state machine: repeating them never repeats side effects.
 
-## 13. Open assumptions (for Phase 1 review)
+## 13. Resolved assumptions (Phase 1 review: "use the standard option" — all accepted as proposed)
 
 | # | Assumption | Alternative |
 |---|-----------|-------------|

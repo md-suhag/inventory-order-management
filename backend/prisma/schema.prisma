@@ -1,5 +1,5 @@
 // =============================================================================
-// Mini Inventory & Order Management System — PostgreSQL schema (Prisma 7)
+// Mini Inventory & Order Management System — PostgreSQL schema (Prisma 6)
 //
 // Conventions
 //   * Tables/columns are snake_case (@@map / @map); Prisma models are PascalCase.
@@ -23,12 +23,12 @@
 // =============================================================================
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // -----------------------------------------------------------------------------

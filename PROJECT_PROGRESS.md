@@ -6,8 +6,8 @@ _Last updated: 2026-11-08_
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 · Inspection & requirements | ✅ Complete — awaiting review | Repo was empty; requirements, NFRs, business rules written |
-| 1 · Architecture & database design | ✅ Complete — **awaiting approval** | Schema, constraints, migration, ERD (5 pages + exports), architecture docs |
+| 0 · Inspection & requirements | ✅ Approved 2026-11-08 | Repo was empty; requirements, NFRs, business rules written |
+| 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports), architecture docs |
 | 2 · Backend foundation | ⏳ Not started (blocked on Phase 1 approval) | |
 | 3 · Core business modules | ⏳ Not started | |
 | 4 · Purchase & inventory | ⏳ Not started | |
@@ -52,7 +52,7 @@ _Last updated: 2026-11-08_
 | docs/database/DATABASE_DESIGN.md | ✅ |
 | docs/diagrams/ERD.drawio (+ SVG/PNG exports, 5 pages) | ✅ generated & visually checked |
 | docs/diagrams/order-flow.mmd | ✅ |
-| backend/prisma/schema.prisma | ✅ validated (Prisma 7.10.1) |
+| backend/prisma/schema.prisma | ✅ validated (Prisma 7.10.1 and 6.19.3) |
 | backend/prisma/sql/constraints.sql | ✅ tested on PostgreSQL 15 |
 | backend/prisma/migrations/20261108000000_init | ✅ applied cleanly; no Prisma drift |
 | scripts/erd/ (ERD generator) | ✅ |
@@ -65,7 +65,7 @@ _Last updated: 2026-11-08_
 ## Key technical decisions (summary — full list in TECHNICAL_DECISIONS.md)
 
 - Modular monolith; Express API + Next.js; Next rewrites `/api` for a same-origin refresh cookie.
-- Prisma 7.10.1 (8.0 is RC only); CHECKs/triggers in hand-written migration SQL.
+- Prisma 6.19 (long-established line, review decision); CHECKs/triggers in hand-written migration SQL.
 - Stock deducted at order confirmation; pessimistic row locks (header → products by id) + DB CHECK backstop.
 - Append-only ledgers: inventory_movements, payments, audit_logs, purchase receipts (DB triggers).
 - Payments: single ledger with PAYMENT / REFUND / REVERSAL; stored aggregates with single writer.

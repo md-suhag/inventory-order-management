@@ -2,15 +2,15 @@
 
 ## 1. Overview
 
-A **modular monolith**: one Express API (TypeScript) organised by business domain, one PostgreSQL database, and a Next.js frontend. The frontend calls the API through its own origin (Next.js rewrite of `/api/*`), so the refresh cookie is first-party and CORS stays strict.
+A **modular monolith**: one Express API (TypeScript) organised by business domain, one PostgreSQL database, and a Next.js frontend. The Next.js **server** is the API's client (Server Components and Server Actions call the API with a bearer token kept in HttpOnly cookies), so the browser never handles tokens and never calls the API directly.
 
 Diagram source: [system-architecture.mmd](system-architecture.mmd). Order/payment/return flow: [../diagrams/order-flow.mmd](../diagrams/order-flow.mmd).
 
 ```
-Browser ──HTTPS──► Next.js (frontend, :3000)
-                     │  /api/*  (rewrite / reverse proxy)
+Browser ──HTTPS──► Next.js (frontend, :3000) — Server Components / Server Actions
+                     │  server-side fetch, Authorization: Bearer
                      ▼
-                  Express API (backend, :4000) ──► PostgreSQL 15+ (:5432)
+                  Express API (backend, :4000) ──► PostgreSQL 16 (:5432)
                      │                         └─► uploads volume (product images)
                      └─► SMTP (Mailpit in dev) for password-reset email
 ```
@@ -95,7 +95,7 @@ Cross-module calls go through the other module's service (e.g. orders → `inven
 
 ### 3.5 Authentication & authorization
 
-- Login → access JWT (15 min; claims `sub`, `tv` = token version) + opaque refresh token cookie (7 days, rotated, family-based reuse detection).
+- Login → access JWT (15 min; claims `sub`, `tv` = token version) + opaque refresh token (7 days, rotated, family-based reuse detection), both returned in the response body; the Next.js server stores them in HttpOnly cookies (TD-06).
 - `authenticate` verifies the JWT, loads the user with role permissions in one query, rejects inactive users or stale `token_version`. One indexed query per request is acceptable at this scale and makes deactivation/permission changes effective immediately.
 - `authorize('orders.confirm')` checks the permission set; services add state/ownership rules (e.g. last-admin protection).
 - The permission catalogue is a TypeScript constant; the seed syncs it into `permissions` and default role grants.
@@ -105,7 +105,7 @@ Cross-module calls go through the other module's service (e.g. orders → `inven
 - Base path `/api/v1`; JSON; plural resource nouns; state transitions as sub-resource actions: `POST /orders/:id/confirm`, `/complete`, `/cancel`; `POST /purchases/:id/receipts`; `POST /payments/:id/reversal`.
 - Success: `200/201` with `{ "data": … }`; lists `{ "data": [...], "meta": { "page", "pageSize", "total", "totalPages" } }`.
 - Error: `{ "error": { "code": "INSUFFICIENT_STOCK", "message": "…", "details": [...], "requestId": "…" } }` with `400` (malformed), `401`, `403`, `404`, `409` (state conflict / duplicate), `422` (validation or business rule), `429`, `500`.
-- Query: `page`, `pageSize`, `sort=field:asc|desc` (whitelisted), `search`, filters by name, date ranges `from`/`to` (ISO dates, business timezone).
+- Query: `page`, `pageSize`, `sort=field:asc|desc` (whitelisted), `search`, filters by name, date ranges `from`/`to` (ISO dates, business timezone) — all parsed by the shared list query builder (TD-25).
 - Money is serialised as **strings** (`"1250.50"`) to avoid float loss; quantities as integers.
 - OpenAPI 3.1 spec in `docs/api/openapi.yaml`, served with Swagger UI at `/api/docs` (disabled in production unless enabled by env).
 
@@ -126,16 +126,17 @@ frontend/src/
 │       └── orders/[id]/invoice         print-optimised invoice view
 ├── components/ui/      shadcn/ui primitives
 ├── components/         DataTable, FormField, ConfirmDialog, MoneyInput, StatusBadge, PageHeader, EmptyState …
-├── lib/api/            fetch client (auth header, single-flight refresh, error normalisation), typed endpoint functions
-├── lib/auth/           AuthProvider (in-memory access token, current user + permissions), <Can permission>
+├── lib/api/            server-only fetch client (bearer from cookies, error normalisation), typed endpoint functions
+├── lib/auth/           session helpers (cookies, current user + permissions), can(permission)
 ├── lib/format/         Intl-based money/date/number formatting from business settings
-└── hooks/              TanStack Query hooks per resource
+├── actions/            Server Actions per module (mutations → revalidatePath)
+└── middleware.ts       redirects unauthenticated users; refreshes expired access tokens
 ```
 
-- Dashboard pages are client components using **TanStack Query** (caching, loading/error states, invalidation after mutations). Server-side rendering adds little for an authenticated back-office app and would require server-side token handling.
-- Forms: **react-hook-form + Zod** (shadcn Form). Validation mirrors the API; server field errors are mapped back to fields.
-- Auth guard: on load the AuthProvider calls `/auth/refresh` (cookie) to obtain an access token and `/auth/me`; unauthenticated users are redirected to `/login?next=…`. The backend remains the authority.
-- Permission-aware UI via `useCan('orders.cancel')`.
+- Pages are **Server Components** that fetch with `fetch(..., { cache: 'no-store' })`; list state (page, search, sort, filters) lives in URL search params; `loading.tsx` / `error.tsx` provide loading and error states.
+- Mutations are **Server Actions** (validated with Zod, then call the API) returning field errors to forms via `useActionState`; small interactive pieces (dialogs, line-item editors) are client components using React state.
+- Auth guard: `middleware.ts` checks the session cookies, refreshes an expired access token, and redirects to `/login?next=…`. The backend remains the authority.
+- Permission-aware UI: the current user's permissions are loaded server-side and used to render navigation and actions.
 
 ## 5. Deployment topology
 

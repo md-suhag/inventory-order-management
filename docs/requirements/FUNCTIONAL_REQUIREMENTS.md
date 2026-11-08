@@ -52,7 +52,7 @@ Every authenticated user can read their own profile and the non-sensitive busine
 
 | ID | Requirement |
 |----|-------------|
-| FR-AUTH-01 | Login with email + password returns a short-lived access token (JWT, 15 min) and sets a rotating refresh token in an `HttpOnly`, `Secure`, `SameSite=Strict` cookie. |
+| FR-AUTH-01 | Login with email + password returns a short-lived access token (JWT, 15 min) and a rotating opaque refresh token (7 days). The Next.js server stores both in `HttpOnly`, `Secure`, `SameSite=Lax` cookies; browser JavaScript never sees them. |
 | FR-AUTH-02 | `POST /auth/refresh` rotates the refresh token (old one revoked, new one issued in the same family). Presenting an already-rotated token outside a short grace window revokes the whole token family (reuse detection). |
 | FR-AUTH-03 | Logout revokes the current refresh token family and clears the cookie. "Log out of all sessions" revokes every refresh token for the user and bumps `token_version`. |
 | FR-AUTH-04 | Self-registration is available **only** when `business_settings.allow_self_registration = true`; self-registered users get the `STAFF` role and are created **inactive** until an Admin activates them. Otherwise accounts are created by Admins. |
@@ -62,7 +62,7 @@ Every authenticated user can read their own profile and the non-sensitive busine
 | FR-AUTH-08 | Change password requires the current password; revokes all other sessions. |
 | FR-AUTH-09 | Brute-force protection: per-IP rate limit on auth endpoints, and per-account lockout (5 consecutive failures → locked 15 min). Lockout responses are indistinguishable from bad credentials. |
 | FR-AUTH-10 | Deactivated users cannot log in or refresh; existing access tokens stop working on the next request (user status is checked on every authenticated request). |
-| FR-AUTH-11 | Passwords: min 8 chars, max 128, hashed with Argon2id. Password hashes, token hashes and lockout counters never appear in API responses or logs. |
+| FR-AUTH-11 | Passwords: min 8 characters, max 72 bytes (bcrypt limit), at least one letter and one digit; hashed with bcrypt (cost 12). Password hashes, token hashes and lockout counters never appear in API responses or logs. |
 | FR-AUTH-12 | Frontend routes under the dashboard require an authenticated session; unauthenticated users are redirected to login and returned to the original page afterwards. |
 
 ## 4. User management & RBAC (USER, ROLE)

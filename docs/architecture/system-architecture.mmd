@@ -3,9 +3,9 @@ flowchart LR
     user([Browser<br/>Admin / Manager / Staff])
 
     subgraph FE[Frontend container · Next.js]
-        pages[App Router pages<br/>client components]
-        rq[TanStack Query<br/>+ API client]
-        proxy[/rewrite /api/* → backend/]
+        pages[App Router<br/>Server Components]
+        actions[Server Actions<br/>mutations]
+        api[server-only API client<br/>bearer from HttpOnly cookies]
     end
 
     subgraph BE[Backend container · Express + TypeScript]
@@ -21,12 +21,14 @@ flowchart LR
         docs[Swagger UI /api/docs]
     end
 
-    db[(PostgreSQL<br/>constraints · triggers · pg_trgm)]
+    db[(PostgreSQL 16<br/>constraints · triggers · pg_trgm)]
     files[(uploads volume)]
     smtp[[SMTP / Mailpit]]
 
     user -- HTTPS --> pages
-    pages --> rq --> proxy -- HTTP JSON --> mw
+    pages --> api
+    actions --> api
+    api -- HTTP JSON + Bearer --> mw
     mw --> auth & catalog & ops & read
     ops --> inv
     auth & catalog & ops & inv & read --> common

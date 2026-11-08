@@ -6,9 +6,9 @@ Targets assume the intended scale: one business, ≤ 50 concurrent users, ≤ 50
 
 | ID | Requirement | How |
 |----|-------------|-----|
-| NFR-SEC-01 | Passwords hashed with Argon2id (OWASP parameters); never logged or returned. | `argon2` |
-| NFR-SEC-02 | Access token: JWT (HS256), 15 min, kept in memory on the client and sent as `Authorization: Bearer`. Refresh token: 256-bit random opaque value, only SHA-256 stored, `HttpOnly; Secure; SameSite=Strict; Path=/api/v1/auth` cookie, 7-day lifetime, rotated on every use. | see TECHNICAL_DECISIONS TD-06 |
-| NFR-SEC-03 | Cookie-authenticated endpoints (`/auth/refresh`, `/auth/logout`) additionally require a matching `Origin` header (CSRF defence in depth). | middleware |
+| NFR-SEC-01 | Passwords hashed with bcrypt (cost 12); never logged or returned. | `bcrypt` |
+| NFR-SEC-02 | Access token: JWT (HS256, issuer/audience checked), 15 min, sent as `Authorization: Bearer`. Refresh token: 256-bit random opaque value, only its SHA-256 stored, 7-day lifetime, rotated on every use. Both held by the Next.js server in `HttpOnly; Secure; SameSite=Lax` cookies. | TD-06 |
+| NFR-SEC-03 | CSRF: the API uses bearer tokens only (not CSRF-able); the frontend's cookie-based mutations go through Next.js Server Actions (built-in origin check) with `SameSite=Lax` cookies. | TD-06 |
 | NFR-SEC-04 | Every endpoint except health, login, refresh, forgot/reset password, (optional) register and API docs requires authentication; every business endpoint declares a permission. A test enumerates routes and fails if one has no permission declaration. | central `authorize()` |
 | NFR-SEC-05 | All input validated with Zod (body, params, query); unknown fields stripped; string lengths bounded; numeric ranges checked. | `validate()` middleware |
 | NFR-SEC-06 | Rate limiting: auth endpoints 10 req/min/IP, forgot-password 5/hour/IP, global 300 req/min/IP. In-memory store (single instance) — swap for a shared store if scaled out. | `express-rate-limit` |
