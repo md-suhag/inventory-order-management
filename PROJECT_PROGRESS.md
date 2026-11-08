@@ -6,24 +6,24 @@ _Last updated: 2026-11-08_
 
 | Phase | Status | Notes |
 |-------|--------|-------|
-| 0 · Inspection & requirements | ✅ Approved 2026-11-08 | Repo was empty; requirements, NFRs, business rules written |
-| 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports), architecture docs |
-| 2 · Backend foundation | ⏳ Not started (blocked on Phase 1 approval) | |
-| 3 · Core business modules | ⏳ Not started | |
-| 4 · Purchase & inventory | ⏳ Not started | |
-| 5 · Orders & payments | ⏳ Not started | |
-| 6 · Returns, reports, audit, settings | ⏳ Not started | |
-| 7 · Frontend | ⏳ Not started | |
-| 8 · Testing & hardening | ⏳ Not started | |
-| 9 · Deployment preparation | ⏳ Not started | |
-| 10 · Final review | ⏳ Not started | |
+| 0 · Inspection & requirements | ✅ Approved 2026-11-08 | Requirements, NFRs, business rules |
+| 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports); review decisions applied |
+| 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
+| 3 · Core business modules | ⏳ Next | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
+| 4 · Purchase & inventory | ⏳ | |
+| 5 · Orders & payments | ⏳ | |
+| 6 · Returns, reports, audit, settings | ⏳ | |
+| 7 · Frontend | ⏳ | |
+| 8 · Testing & hardening | ⏳ | |
+| 9 · Deployment preparation | ⏳ | |
+| 10 · Final review | ⏳ | |
 
-## Modules (implementation)
+## Modules
 
 | Module | DB design | Backend | Frontend | Tests |
 |--------|:-:|:-:|:-:|:-:|
-| Auth & accounts | ✅ | – | – | – |
-| Users & RBAC | ✅ | – | – | – |
+| Auth & accounts | ✅ | ✅ | – | ✅ |
+| Users & RBAC | ✅ | 🟡 RBAC middleware, permission catalogue, seeded roles; user/role CRUD in Phase 3 | – | 🟡 |
 | Dashboard | ✅ | – | – | – |
 | Products | ✅ | – | – | – |
 | Categories | ✅ | – | – | – |
@@ -35,56 +35,63 @@ _Last updated: 2026-11-08_
 | Payments | ✅ | – | – | – |
 | Sales returns | ✅ | – | – | – |
 | Reports | ✅ | – | – | – |
-| Audit logs | ✅ | – | – | – |
-| Business settings | ✅ | – | – | – |
+| Audit logs | ✅ | 🟡 recorder + immutability; read API in Phase 6 | – | 🟡 |
+| Business settings | ✅ | 🟡 seeded row; API in Phase 6 | – | – |
 
-## Deliverables
+## Phase 2 deliverables
 
-| Path | Status |
-|------|--------|
-| docs/requirements/PROJECT_OVERVIEW.md | ✅ |
-| docs/requirements/FUNCTIONAL_REQUIREMENTS.md | ✅ |
-| docs/requirements/NON_FUNCTIONAL_REQUIREMENTS.md | ✅ |
-| docs/requirements/BUSINESS_RULES.md | ✅ |
-| docs/architecture/SYSTEM_ARCHITECTURE.md | ✅ |
-| docs/architecture/TECHNICAL_DECISIONS.md | ✅ (TD-17, TD-23 proposed) |
-| docs/architecture/system-architecture.mmd | ✅ |
-| docs/database/DATABASE_DESIGN.md | ✅ |
-| docs/diagrams/ERD.drawio (+ SVG/PNG exports, 5 pages) | ✅ generated & visually checked |
-| docs/diagrams/order-flow.mmd | ✅ |
-| backend/prisma/schema.prisma | ✅ validated (Prisma 7.10.1 and 6.19.3) |
-| backend/prisma/sql/constraints.sql | ✅ tested on PostgreSQL 15 |
-| backend/prisma/migrations/20261108000000_init | ✅ applied cleanly; no Prisma drift |
-| scripts/erd/ (ERD generator) | ✅ |
-| docs/api/API_DESIGN.md, openapi.yaml | ⏳ Phase 2+ (designed per module before implementation) |
-| docs/security/SECURITY.md | ⏳ Phase 2 |
-| docs/testing/TESTING_STRATEGY.md | ⏳ Phase 2 |
-| docs/deployment/DEPLOYMENT.md | ⏳ Phase 9 |
-| README.md | ⏳ Phase 2 (setup), completed in Phase 9 |
+- `backend/` package (Express 5, TypeScript 5.9, Prisma 6.19, Zod 4) with strict TS, ESLint, Prettier.
+- Zod-validated env with production guards; pino logging with redaction and request ids.
+- Error model with stable codes; Prisma/PostgreSQL error mapping; deadlock-retrying `withTransaction`.
+- Typed request validation (`handler`), custom list query builder (pagination, search incl. relations, whitelisted multi-sort, filters).
+- Security middleware: helmet, CORS allow-list, rate limits, idempotency-key requirement.
+- Auth: login (bcrypt, lockout, timing equalisation), refresh rotation + reuse detection, logout/logout-all, profile, change/reset password, optional self-registration.
+- RBAC: permission catalogue, `authenticate`/`authorize`, live permission changes, ADMIN implicit full access.
+- Audit recorder (same-transaction), health endpoints, Swagger UI, graceful shutdown.
+- Idempotent seed (permissions, roles, settings, sequences, payment methods, admin).
+- Docker Compose (PostgreSQL 16 + Mailpit), GitHub Actions CI.
+- Docs: API_DESIGN.md, openapi.yaml, SECURITY.md, TESTING_STRATEGY.md, README.md.
 
-## Key technical decisions (summary — full list in TECHNICAL_DECISIONS.md)
+## Key technical decisions (full list: docs/architecture/TECHNICAL_DECISIONS.md)
 
-- Modular monolith; Express API + Next.js; Next rewrites `/api` for a same-origin refresh cookie.
-- Prisma 6.19 (long-established line, review decision); CHECKs/triggers in hand-written migration SQL.
-- Stock deducted at order confirmation; pessimistic row locks (header → products by id) + DB CHECK backstop.
-- Append-only ledgers: inventory_movements, payments, audit_logs, purchase receipts (DB triggers).
-- Payments: single ledger with PAYMENT / REFUND / REVERSAL; stored aggregates with single writer.
-- Weighted-average cost; cost snapshots on order lines and movements.
-- Per-entity idempotency keys; state-machine idempotency for transitions.
-- Gap-free document numbers via `document_sequences`.
+- Stable-version policy (TS 5.9, Prisma 6.19, Next.js 15, Vitest 4, PostgreSQL 16); security fixes override it (nodemailer 10).
+- Modular monolith; the Next.js server is the API client and keeps tokens in HttpOnly cookies (BFF); Next.js native fetching, no TanStack Query.
+- bcrypt password hashing; hand-written OpenAPI with a route-coverage test.
+- Stock deducted at order confirmation with row locks + DB CHECK backstop; append-only ledgers enforced by triggers.
+- Single payment ledger (PAYMENT/REFUND/REVERSAL); weighted-average cost; per-entity idempotency keys; gap-free document numbers.
 
-## Open questions (Phase 1 review)
+## Git
 
-See BUSINESS_RULES.md §13 (A1–A7).
+| Branch | Content |
+|--------|---------|
+| `main` | Phase 0–2 (merged) |
 
-## Known issues
+Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
-- None in code (no application code yet).
-- The headless draw.io export needs `--shm-size=2g` (documented in docs/diagrams/README.md).
+## Known issues / notes
+
+- Dev-only moderate advisory in `typescript-eslint` → `minimatch` (lint tooling only). Production audit: 0 vulnerabilities.
+- Rate limiting uses an in-memory store (single instance by design, TD-24).
+- CI workflow is written but has not run yet (no GitHub remote configured).
 
 ## Test status
 
-| Suite | Status |
-|-------|--------|
-| DB constraint checks (manual SQL, Phase 1) | 22/22 rejected as expected |
-| Unit / integration / E2E | Not started |
+| Suite | Tests | Result |
+|-------|-------|--------|
+| Unit | 39 | ✅ |
+| Integration (PostgreSQL 16) | 38 | ✅ |
+| DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
+| E2E | – | Phase 8 |
+
+## Documentation status
+
+| Document | Status |
+|----------|--------|
+| requirements/* (4) | ✅ |
+| architecture/* (3) | ✅ updated with review decisions |
+| database/DATABASE_DESIGN.md, diagrams/* | ✅ |
+| api/API_DESIGN.md, api/openapi.yaml | ✅ auth/health/roles; extended per module |
+| security/SECURITY.md | ✅ Phase 2 controls |
+| testing/TESTING_STRATEGY.md | ✅ |
+| deployment/DEPLOYMENT.md | ⏳ Phase 9 |
+| README.md | ✅ setup; deployment section in Phase 9 |
