@@ -1,0 +1,35 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+build/
+.next/
+out/
+coverage/
+*.tsbuildinfo
+
+# generated
+backend/src/generated/
+
+# env & secrets
+.env
+.env.*
+!.env.example
+
+# runtime data
+backend/uploads/
+*.log
+logs/
+
+# test artifacts
+playwright-report/
+test-results/
+blob-report/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json

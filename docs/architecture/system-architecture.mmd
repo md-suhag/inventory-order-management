@@ -1,0 +1,35 @@
+%% System architecture — Mini Inventory & Order Management System
+flowchart LR
+    user([Browser<br/>Admin / Manager / Staff])
+
+    subgraph FE[Frontend container · Next.js]
+        pages[App Router pages<br/>client components]
+        rq[TanStack Query<br/>+ API client]
+        proxy[/rewrite /api/* → backend/]
+    end
+
+    subgraph BE[Backend container · Express + TypeScript]
+        mw[Middleware<br/>requestId · helmet · cors · rate limit<br/>authenticate · authorize · validate · idempotency]
+        subgraph MOD[Domain modules]
+            auth[auth · users · roles]
+            catalog[products · categories<br/>suppliers · customers]
+            ops[purchases · orders<br/>returns · payments]
+            inv[inventory<br/>single stock writer]
+            read[dashboard · reports<br/>audit-logs · settings]
+        end
+        common[common: errors · withTransaction · locking<br/>document numbers · audit · domain calculations]
+        docs[Swagger UI /api/docs]
+    end
+
+    db[(PostgreSQL<br/>constraints · triggers · pg_trgm)]
+    files[(uploads volume)]
+    smtp[[SMTP / Mailpit]]
+
+    user -- HTTPS --> pages
+    pages --> rq --> proxy -- HTTP JSON --> mw
+    mw --> auth & catalog & ops & read
+    ops --> inv
+    auth & catalog & ops & inv & read --> common
+    common -- Prisma / pg --> db
+    catalog -- images --> files
+    auth -- reset email --> smtp

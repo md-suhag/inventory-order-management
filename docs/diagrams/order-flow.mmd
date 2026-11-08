@@ -1,0 +1,47 @@
+%% Order lifecycle with stock, payment and return effects
+%% (purchase receiving follows the same transaction pattern: lock → validate → movement → aggregates → audit)
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant API as Orders service
+    participant INV as Inventory service
+    participant PAY as Payments service
+    participant DB as PostgreSQL
+
+    U->>API: POST /orders (DRAFT)
+    API->>DB: insert order + lines (price/tax snapshots), no stock change
+
+    U->>API: POST /orders/:id/confirm
+    API->>DB: BEGIN; SELECT order FOR UPDATE (status must be DRAFT)
+    API->>INV: deductForOrder(tx, lines)
+    INV->>DB: SELECT products WHERE id IN (...) ORDER BY id FOR UPDATE
+    alt any line short of stock
+        INV-->>API: InsufficientStock [all short lines]
+        API->>DB: ROLLBACK
+        API-->>U: 422 INSUFFICIENT_STOCK
+    else stock available
+        INV->>DB: UPDATE products.stock_quantity; INSERT SALE movement per line
+        API->>DB: snapshot unit_cost, invoice no., billing; status=CONFIRMED; audit; COMMIT
+        API-->>U: 200 order (CONFIRMED)
+    end
+
+    U->>PAY: POST /payments (Idempotency-Key)
+    PAY->>DB: BEGIN; SELECT order FOR UPDATE; amount ≤ balance_due?
+    PAY->>DB: INSERT payment; UPDATE paid_amount, payment_status; audit; COMMIT
+
+    U->>API: POST /orders/:id/complete
+    API->>DB: status CONFIRMED→COMPLETED (no stock change)
+
+    opt Cancellation (CONFIRMED only)
+        U->>API: POST /orders/:id/cancel
+        API->>INV: restoreForOrder → SALE_CANCELLATION movements (exactly once)
+        API->>PAY: recompute payment status (paid money becomes refundable)
+    end
+
+    opt Sales return (COMPLETED only)
+        U->>API: POST /returns (PENDING)
+        U->>API: POST /returns/:id/complete
+        API->>INV: SALE_RETURN movements for RESALABLE lines only
+        API->>PAY: returned_amount += credit; recompute status
+        U->>PAY: POST /payments type=REFUND (≤ refundable)
+    end
