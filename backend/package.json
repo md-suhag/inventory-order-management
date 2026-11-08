@@ -25,7 +25,7 @@
     "db:reset": "prisma migrate reset --force"
   },
   "prisma": {
-    "seed": "tsx prisma/seed.ts"
+    "seed": "tsx src/database/seed/run.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
