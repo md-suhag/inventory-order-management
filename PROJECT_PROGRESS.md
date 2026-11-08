@@ -38,6 +38,16 @@ _Last updated: 2026-11-08_
 | Audit logs | ✅ | 🟡 recorder + immutability; read API in Phase 6 | – | 🟡 |
 | Business settings | ✅ | 🟡 seeded row; API in Phase 6 | – | – |
 
+## Next steps (handoff — start here)
+
+Any agent/developer continuing the work: read `AGENTS.md` first, then:
+
+1. Create branch `phase-3/core-modules`.
+2. Users & roles: user CRUD/list (query builder), activate/deactivate, role assignment with **last-active-admin protection** (advisory lock, BR-USER-02), self-change restrictions (BR-USER-03), session revocation on deactivate/role change (BR-USER-04); role CRUD + permission editing (ADMIN immutable).
+3. Categories, products (+ images, opening stock via inventory movement, cost hidden without `products.view_cost`), suppliers, customers — each with list/search/sort/filter, archive rules, audit logs.
+4. Dashboard foundation (counts, low stock, recent activity — financial tiles once orders/purchases exist).
+5. For every module: tests, `openapi.yaml` + `API_DESIGN.md`, commit per task, update this file.
+
 ## Phase 2 deliverables
 
 - `backend/` package (Express 5, TypeScript 5.9, Prisma 6.19, Zod 4) with strict TS, ESLint, Prettier.
@@ -64,7 +74,7 @@ _Last updated: 2026-11-08_
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–2 (merged) |
+| `main` | Phase 0–2 (merged) — not yet pushed to any remote |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 

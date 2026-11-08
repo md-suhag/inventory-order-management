@@ -4,6 +4,8 @@ A portfolio-grade inventory and order management system for a small/medium busin
 
 > **Status:** Phase 2 (backend foundation, authentication, RBAC) complete. See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
 
+> **Contributors and AI agents:** read [AGENTS.md](AGENTS.md) first — working rules, owner decisions, conventions and setup. The original brief is in [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
+
 ## Stack
 
 | Layer | Technology |
