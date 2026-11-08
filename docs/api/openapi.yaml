@@ -1,0 +1,477 @@
+openapi: 3.0.3
+info:
+  title: Mini Inventory & Order Management API
+  version: 0.1.0
+  description: |
+    REST API for the Mini Inventory & Order Management System.
+
+    * Conventions (envelopes, pagination, sorting, errors, idempotency): see `docs/api/API_DESIGN.md`.
+    * Authentication: `Authorization: Bearer <accessToken>` obtained from `POST /auth/login`.
+    * Every protected operation lists its required permission under `x-permission`.
+    * Money values are strings with 2 decimals (e.g. `"1250.50"`); quantities are integers.
+
+    This spec is written by hand and kept in sync with the code by an automated test
+    that compares it with the registered Express routes.
+servers:
+  - url: /api/v1
+    description: Current server
+tags:
+  - name: Health
+  - name: Auth
+    description: Login, session tokens, profile and password management
+  - name: Roles
+    description: Roles and the permission catalogue
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health/live:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      security: []
+      responses:
+        '200':
+          description: Process is up
+          content:
+            application/json:
+              example: { status: ok, uptimeSeconds: 42 }
+
+  /health/ready:
+    get:
+      tags: [Health]
+      summary: Readiness probe (checks database connectivity)
+      security: []
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              example: { status: ok, checks: { database: ok } }
+        '503':
+          description: Database unreachable
+          content:
+            application/json:
+              example: { status: unavailable, checks: { database: unreachable } }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      description: |
+        Returns a 15-minute access token and a 7-day rotating refresh token.
+        After 5 consecutive failures the account is locked for 15 minutes; locked, unknown-email and
+        wrong-password attempts all return the same `401 INVALID_CREDENTIALS`.
+        Rate limit: 10 requests/minute/IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email, maxLength: 254, description: Case-insensitive }
+                password: { type: string, minLength: 1, maxLength: 200 }
+            example: { email: admin@example.com, password: ChangeMe123! }
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Session' }
+        '401': { $ref: '#/components/responses/InvalidCredentials' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Rotate the refresh token and get a new access token
+      description: |
+        The presented refresh token is revoked and replaced. Re-using an already rotated token
+        (after a 10-second grace window for parallel requests) is treated as theft: the whole
+        session family is revoked.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenBody' }
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/TokenPair' }
+        '401': { $ref: '#/components/responses/InvalidToken' }
+        '403': { $ref: '#/components/responses/AccountInactive' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (revoke the session's refresh-token family)
+      description: Idempotent — always returns 204.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefreshTokenBody' }
+      responses:
+        '204': { description: Logged out }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Log out of all sessions
+      description: Revokes every refresh token of the user and invalidates all outstanding access tokens.
+      responses:
+        '204': { description: All sessions revoked }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Self-register (only when enabled in business settings)
+      description: Creates an **inactive** STAFF account that an administrator must activate.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, password]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                email: { type: string, format: email }
+                phone: { type: string, pattern: '^[0-9+()\-\s]{5,30}$' }
+                password: { $ref: '#/components/schemas/Password' }
+            example: { name: Rahim Uddin, email: rahim@example.com, password: Welcome123 }
+      responses:
+        '201':
+          description: Registered (pending activation)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      user: { $ref: '#/components/schemas/User' }
+                      message: { type: string }
+        '403':
+          description: Self-registration is disabled
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: REGISTRATION_DISABLED, message: Self-registration is disabled; ask an administrator for an account, requestId: 3f1c… } }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request a password reset email
+      description: |
+        Always returns 202 with the same message (no account enumeration). If an active account
+        exists, a single-use link valid for 30 minutes is emailed. Rate limit: 5 requests/hour/IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '202':
+          description: Accepted
+          content:
+            application/json:
+              example: { data: { message: 'If an active account exists for this email, a password reset link has been sent.' } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Set a new password using the emailed token
+      description: Consumes the token, clears any lockout and revokes all sessions.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, newPassword]
+              properties:
+                token: { type: string, minLength: 20, maxLength: 200 }
+                newPassword: { $ref: '#/components/schemas/Password' }
+      responses:
+        '204': { description: Password changed }
+        '400':
+          description: Token invalid, used or expired
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Error' }
+              example: { error: { code: INVALID_TOKEN, message: This password reset link is invalid or has expired, requestId: 3f1c… } }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current user with effective permissions
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/CurrentUser' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+    patch:
+      tags: [Auth]
+      summary: Update own profile (name, phone)
+      description: Email, role and status cannot be changed here (unknown fields are ignored).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                phone: { type: string, nullable: true, pattern: '^[0-9+()\-\s]{5,30}$' }
+            example: { name: Jane Manager, phone: '+880 1711-000000' }
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      summary: Change own password
+      description: Revokes every session (including other devices) and returns a fresh token pair for the caller.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [currentPassword, newPassword]
+              properties:
+                currentPassword: { type: string }
+                newPassword: { $ref: '#/components/schemas/Password' }
+      responses:
+        '200':
+          description: New token pair
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/TokenPair' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /roles/permissions:
+    get:
+      tags: [Roles]
+      summary: Permission catalogue
+      x-permission: roles.read
+      responses:
+        '200':
+          description: All permissions
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PermissionInfo' }
+              example:
+                data:
+                  - { key: orders.confirm, module: orders, description: Confirm orders (deducts stock) }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Password:
+      type: string
+      minLength: 8
+      description: 8+ characters, at most 72 bytes (bcrypt limit), at least one letter and one digit.
+      example: Welcome123
+
+    RefreshTokenBody:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken: { type: string, minLength: 20, maxLength: 200 }
+
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string, description: JWT (HS256) }
+        accessTokenExpiresIn: { type: integer, description: Seconds, example: 900 }
+        refreshToken: { type: string, description: Opaque, 43 characters }
+        refreshTokenExpiresAt: { type: string, format: date-time }
+
+    Session:
+      allOf:
+        - $ref: '#/components/schemas/TokenPair'
+        - type: object
+          properties:
+            user: { $ref: '#/components/schemas/User' }
+
+    RoleRef:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: MANAGER }
+
+    User:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        email: { type: string, format: email }
+        phone: { type: string, nullable: true }
+        isActive: { type: boolean }
+        lastLoginAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        role: { $ref: '#/components/schemas/RoleRef' }
+
+    CurrentUser:
+      allOf:
+        - $ref: '#/components/schemas/User'
+        - type: object
+          properties:
+            permissions:
+              type: array
+              items: { type: string }
+              example: [dashboard.read, orders.read, orders.manage, orders.confirm]
+
+    PermissionInfo:
+      type: object
+      properties:
+        key: { type: string }
+        module: { type: string }
+        description: { type: string }
+
+    PageMeta:
+      type: object
+      properties:
+        page: { type: integer, example: 1 }
+        pageSize: { type: integer, example: 20 }
+        total: { type: integer, example: 57 }
+        totalPages: { type: integer, example: 3 }
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          required: [code, message, requestId]
+          properties:
+            code: { type: string, example: VALIDATION_ERROR }
+            message: { type: string }
+            details:
+              type: array
+              items:
+                type: object
+                properties:
+                  field: { type: string }
+                  message: { type: string }
+            requestId: { type: string }
+
+  responses:
+    ValidationError:
+      description: Request validation failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed
+              details: [{ field: email, message: Invalid email address }]
+              requestId: 3f1c2a9e-…
+    Unauthenticated:
+      description: Missing, invalid or expired access token (`UNAUTHENTICATED`, `INVALID_TOKEN`, `TOKEN_EXPIRED`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: TOKEN_EXPIRED, message: Access token expired, requestId: 3f1c… } }
+    InvalidCredentials:
+      description: Wrong email/password, unknown account, or locked account
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: INVALID_CREDENTIALS, message: Invalid email or password, requestId: 3f1c… } }
+    InvalidToken:
+      description: Refresh token invalid, expired, revoked or reused
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: INVALID_TOKEN, message: Invalid or expired refresh token, requestId: 3f1c… } }
+    AccountInactive:
+      description: The account is deactivated
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: ACCOUNT_INACTIVE, message: Account is deactivated, requestId: 3f1c… } }
+    Forbidden:
+      description: Authenticated but lacking the required permission
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: FORBIDDEN, message: You do not have permission to perform this action, requestId: 3f1c… } }
+    Duplicate:
+      description: Unique constraint conflict
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: DUPLICATE, message: An account with this email already exists, requestId: 3f1c… } }
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: RATE_LIMITED, message: 'Too many authentication attempts, please try again later', requestId: 3f1c… } }
