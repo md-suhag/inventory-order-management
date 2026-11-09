@@ -1,6 +1,6 @@
 # Project Progress
 
-_Last updated: 2026-11-08_
+_Last updated: 2026-11-09_
 
 ## Phase status
 
@@ -9,7 +9,7 @@ _Last updated: 2026-11-08_
 | 0 · Inspection & requirements | ✅ Approved 2026-11-08 | Requirements, NFRs, business rules |
 | 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports); review decisions applied |
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
-| 3 · Core business modules | ⏳ Next | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
+| 3 · Core business modules | 🚧 In progress (`phase-3/core-modules`) | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ⏳ | |
 | 5 · Orders & payments | ⏳ | |
 | 6 · Returns, reports, audit, settings | ⏳ | |
@@ -42,7 +42,7 @@ _Last updated: 2026-11-08_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Create branch `phase-3/core-modules`.
+1. ~~Create branch `phase-3/core-modules`.~~ Done 2026-11-09.
 2. Users & roles: user CRUD/list (query builder), activate/deactivate, role assignment with **last-active-admin protection** (advisory lock, BR-USER-02), self-change restrictions (BR-USER-03), session revocation on deactivate/role change (BR-USER-04); role CRUD + permission editing (ADMIN immutable).
 3. Categories, products (+ images, opening stock via inventory movement, cost hidden without `products.view_cost`), suppliers, customers — each with list/search/sort/filter, archive rules, audit logs.
 4. Dashboard foundation (counts, low stock, recent activity — financial tiles once orders/purchases exist).
@@ -74,7 +74,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–2 (merged) — not yet pushed to any remote |
+| `main` | Phase 0–2 + npm 10 lockfile fix (PR #1) — pushed to `origin` (GitHub) |
+| `phase-3/core-modules` | Phase 3 work in progress (local) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -82,7 +83,7 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 
 - Dev-only moderate advisory in `typescript-eslint` → `minimatch` (lint tooling only). Production audit: 0 vulnerabilities.
 - Rate limiting uses an in-memory store (single instance by design, TD-24).
-- CI workflow is written but has not run yet (no GitHub remote configured).
+- GitHub remote `origin` configured; CI runs on GitHub Actions (lockfile synced with npm 10 for `npm ci`).
 
 ## Test status
 
