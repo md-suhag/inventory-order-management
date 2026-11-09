@@ -23,7 +23,7 @@ _Last updated: 2026-11-09_
 | Module | DB design | Backend | Frontend | Tests |
 |--------|:-:|:-:|:-:|:-:|
 | Auth & accounts | ✅ | ✅ | – | ✅ |
-| Users & RBAC | ✅ | 🟡 RBAC middleware, permission catalogue, seeded roles; user/role CRUD in Phase 3 | – | 🟡 |
+| Users & RBAC | ✅ | ✅ user admin API (last-admin guard, BR-USER-02..07), role CRUD + permission editing | – | ✅ |
 | Dashboard | ✅ | – | – | – |
 | Products | ✅ | – | – | – |
 | Categories | ✅ | – | – | – |
@@ -43,7 +43,7 @@ _Last updated: 2026-11-09_
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 1. ~~Create branch `phase-3/core-modules`.~~ Done 2026-11-09.
-2. Users & roles: user CRUD/list (query builder), activate/deactivate, role assignment with **last-active-admin protection** (advisory lock, BR-USER-02), self-change restrictions (BR-USER-03), session revocation on deactivate/role change (BR-USER-04); role CRUD + permission editing (ADMIN immutable).
+2. ~~Users & roles~~ Done 2026-11-09 (BR-USER-06/07 added: anti-escalation rules).
 3. Categories, products (+ images, opening stock via inventory movement, cost hidden without `products.view_cost`), suppliers, customers — each with list/search/sort/filter, archive rules, audit logs.
 4. Dashboard foundation (counts, low stock, recent activity — financial tiles once orders/purchases exist).
 5. For every module: tests, `openapi.yaml` + `API_DESIGN.md`, commit per task, update this file.

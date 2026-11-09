@@ -115,5 +115,10 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | POST | `/users/:id/activate` | ✔ | `users.manage` | Idempotent; clears lockout |
 | POST | `/users/:id/deactivate` | ✔ | `users.manage` | Idempotent; revokes sessions; not self; last active admin protected |
 | GET | `/roles/permissions` | ✔ | `roles.read` | Permission catalogue |
+| GET | `/roles` | ✔ | `roles.read` | With permissions + `userCount`; search name/description; sort `name`, `createdAt` |
+| POST | `/roles` | ✔ | `roles.manage` | Custom role; names unique case-insensitively; non-admins only grant what they hold |
+| GET | `/roles/:id` | ✔ | `roles.read` | |
+| PATCH | `/roles/:id` | ✔ | `roles.manage` | `permissions` replaces the set; ADMIN immutable; system roles not renamable; non-admins not on own role |
+| DELETE | `/roles/:id` | ✔ | `roles.manage` | Custom roles only; 409 `REFERENCED` while users hold it |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.

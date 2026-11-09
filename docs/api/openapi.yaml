@@ -495,6 +495,141 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /roles:
+    get:
+      tags: [Roles]
+      summary: List roles with permissions and user counts
+      description: The system ADMIN role always reports every permission (implicit full access).
+      x-permission: roles.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          description: Case-insensitive match on name or description
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          description: 'Up to 3 keys from: name, createdAt (default name:asc)'
+          schema: { type: string }
+      responses:
+        '200':
+          description: Page of roles
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Role' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Roles]
+      summary: Create a custom role
+      description: |
+        Names are unique case-insensitively. A caller who is not an administrator can only grant
+        permissions they hold themselves (`FORBIDDEN`).
+      x-permission: roles.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 50, pattern: '^[A-Za-z0-9][A-Za-z0-9 _-]*$' }
+                description: { type: string, maxLength: 255, nullable: true }
+                permissions:
+                  type: array
+                  items: { type: string }
+                  description: Permission keys from `GET /roles/permissions`; duplicates are ignored
+            example: { name: Warehouse, description: Receiving team, permissions: [inventory.read, purchases.receive] }
+      responses:
+        '201':
+          description: Created role
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Roles]
+      summary: Get a role
+      x-permission: roles.read
+      responses:
+        '200':
+          description: Role
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Roles]
+      summary: Update a role (name, description, permission set)
+      description: |
+        `permissions` replaces the whole set; holders get the change on their next request.
+        `BUSINESS_RULE_VIOLATION`: the ADMIN role is immutable and system roles cannot be renamed.
+        A caller who is not an administrator cannot edit their own role or grant permissions they lack (`FORBIDDEN`).
+      x-permission: roles.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 2, maxLength: 50 }
+                description: { type: string, maxLength: 255, nullable: true }
+                permissions:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Updated role
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Role' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+    delete:
+      tags: [Roles]
+      summary: Delete a custom role
+      description: System roles cannot be deleted (`BUSINESS_RULE_VIOLATION`); a role still held by users returns `409 REFERENCED`.
+      x-permission: roles.manage
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Referenced' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -573,6 +708,21 @@ components:
               type: array
               items: { type: string }
               example: [dashboard.read, orders.read, orders.manage, orders.confirm]
+
+    Role:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: Warehouse }
+        description: { type: string, nullable: true }
+        isSystem: { type: boolean }
+        permissions:
+          type: array
+          items: { type: string }
+          example: [inventory.read, purchases.receive]
+        userCount: { type: integer, example: 3 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
 
     PermissionInfo:
       type: object
@@ -661,6 +811,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: RATE_LIMITED, message: 'Too many authentication attempts, please try again later', requestId: 3f1c… } }
+    Referenced:
+      description: The record is still referenced by other records
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: REFERENCED, message: Role is assigned to 2 user(s); reassign them first, requestId: 3f1c… } }
     NotFound:
       description: Resource not found
       content:
