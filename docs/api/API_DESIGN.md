@@ -167,5 +167,22 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | POST | `/inventory/adjustments` | ✔ | `inventory.adjust` | Single-product stock adjustment (IN/OUT); reason required, non-empty notes mandatory for OTHER; requires `Idempotency-Key` |
 | GET | `/inventory/movements` | ✔ | `inventory.read` | Movement history; filter by product, type, dates, performedBy; unitCost gated by `products.view_cost` |
 | GET | `/inventory/movements/:id` | ✔ | `inventory.read` | Movement detail; unitCost gated by `products.view_cost` |
+| GET | `/orders` | ✔ | `orders.read` | Paginated orders; filter by customerId, status, paymentStatus, date range; search by number, customer |
+| POST | `/orders` | ✔ | `orders.manage` | Create DRAFT order; server calculates line and document totals; gap-free SO-XXXXXX allocated; walk-in customer supported |
+| GET | `/orders/:id` | ✔ | `orders.read` | Order detail with lines, snapshots, payments, fulfillment dates and balance due |
+| PATCH | `/orders/:id` | ✔ | `orders.manage` | Update draft order fields and lines; 409 if not in DRAFT |
+| DELETE | `/orders/:id` | ✔ | `orders.manage` | Delete draft order; 409 if not in DRAFT |
+| POST | `/orders/:id/confirm` | ✔ | `orders.confirm` | Confirm order and atomically deduct stock with SALE movements; snapshots WAC unit cost; allocates gap-free INV-XXXXXX (BR-ORD-03) |
+| POST | `/orders/:id/cancel` | ✔ | `orders.manage` / `orders.cancel` | Cancels DRAFT (no stock effect) or CONFIRMED (restores stock with SALE_CANCELLATION); rejects if non-refunded payments exist or if shipped/delivered/completed |
+| POST | `/orders/:id/ship` | ✔ | `orders.complete` | Transitions CONFIRMED → SHIPPED with carrier and tracking number |
+| POST | `/orders/:id/deliver` | ✔ | `orders.complete` | Transitions SHIPPED → DELIVERED |
+| POST | `/orders/:id/complete` | ✔ | `orders.complete` | Transitions order to COMPLETED |
+| GET | `/orders/:id/invoice` | ✔ | `orders.read` | Printable invoice with business details, line snapshots, totals, and payment balance |
+| POST | `/orders/:id/payments` | ✔ | `payments.record_customer` | Record customer payment; rejects overpayment (BR-PAY-03); updates paidAmount and paymentStatus; requires `Idempotency-Key` |
+| POST | `/orders/:id/refunds` | ✔ | `payments.refund` | Record refund; rejects if refund exceeds net paid amount (BR-PAY-04); requires `Idempotency-Key` |
+| GET | `/orders/:id/payments` | ✔ | `payments.read` | List payments, refunds and reversals for order |
+| GET | `/payments` | ✔ | `payments.read` | Paginated payment ledger with filters (orderId, purchaseId, method, type, date range) |
+| GET | `/payments/:id` | ✔ | `payments.read` | Payment detail |
+| POST | `/payments/:id/reverse` | ✔ | `payments.reverse` | Voids payment/refund by recording append-only REVERSAL row with mandatory reason; adjusts document balance; requires `Idempotency-Key` |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.

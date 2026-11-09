@@ -71,6 +71,8 @@ enum PurchaseStatus {
 enum OrderStatus {
   DRAFT
   CONFIRMED
+  SHIPPED
+  DELIVERED
   COMPLETED
   CANCELLED
 }
@@ -571,6 +573,10 @@ model Order {
   cancelledById      String?       @map("cancelled_by_id") @db.Uuid
   cancelledAt        DateTime?     @map("cancelled_at") @db.Timestamptz(3)
   cancellationReason String?       @map("cancellation_reason") @db.VarChar(500)
+  carrier            String?       @db.VarChar(100)
+  trackingNumber     String?       @map("tracking_number") @db.VarChar(100)
+  shippedAt          DateTime?     @map("shipped_at") @db.Timestamptz(3)
+  deliveredAt        DateTime?     @map("delivered_at") @db.Timestamptz(3)
   createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt          DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
 

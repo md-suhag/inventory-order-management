@@ -33,6 +33,14 @@ tags:
     description: Suppliers and their purchase balances
   - name: Customers
     description: Customers and their order balances
+  - name: Purchases
+    description: Purchases from suppliers and goods receipt
+  - name: Inventory
+    description: Stock overview, movements and adjustments
+  - name: Orders
+    description: Customer orders, line snapshotting and lifecycle
+  - name: Payments
+    description: Payment ledger, refunds and reversals
 
 security:
   - bearerAuth: []
@@ -1800,6 +1808,475 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /orders:
+    get:
+      tags: [Orders]
+      summary: List orders
+      description: Paginated orders with filters.
+      x-permission: orders.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Search'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [orderNumber, createdAt, confirmedAt, totalAmount]
+            default: createdAt
+        - $ref: '#/components/parameters/SortDir'
+        - name: customerId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          description: Comma-separated list of order statuses
+          schema: { type: string, example: 'DRAFT,CONFIRMED' }
+        - name: paymentStatus
+          in: query
+          description: Comma-separated list of payment statuses
+          schema: { type: string, example: 'UNPAID,PARTIALLY_PAID' }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Paginated orders
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/OrderListItem' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Orders]
+      summary: Create a draft order
+      description: Calculates lines and totals server-side, generates gap-free SO-XXXXXX number.
+      x-permission: orders.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateOrderInput' }
+      responses:
+        '201':
+          description: Created order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /orders/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Orders]
+      summary: Order detail
+      x-permission: orders.read
+      responses:
+        '200':
+          description: Order detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Orders]
+      summary: Update a draft order
+      x-permission: orders.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateOrderInput' }
+      responses:
+        '200':
+          description: Updated order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+    delete:
+      tags: [Orders]
+      summary: Delete a draft order
+      x-permission: orders.manage
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders]
+      summary: Confirm order and deduct stock
+      description: Validates and deducts stock via SALE movement atomically, snapshots WAC unit cost, assigns INV-XXXXXX.
+      x-permission: orders.confirm
+      responses:
+        '200':
+          description: Confirmed order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /orders/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders]
+      summary: Cancel order
+      description: Cancels draft without stock changes; cancels confirmed order restoring stock with SALE_CANCELLATION movements.
+      x-permission: orders.manage
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CancelOrderInput' }
+      responses:
+        '200':
+          description: Cancelled order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /orders/{id}/ship:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders]
+      summary: Mark order as shipped
+      description: Transitions CONFIRMED order to SHIPPED with carrier and tracking number.
+      x-permission: orders.complete
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ShipOrderInput' }
+      responses:
+        '200':
+          description: Shipped order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}/deliver:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders]
+      summary: Mark order as delivered
+      description: Transitions SHIPPED order to DELIVERED.
+      x-permission: orders.complete
+      responses:
+        '200':
+          description: Delivered order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders]
+      summary: Complete order
+      description: Transitions order to COMPLETED.
+      x-permission: orders.complete
+      responses:
+        '200':
+          description: Completed order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}/invoice:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Orders]
+      summary: Get printable invoice
+      description: Returns printable invoice details for confirmed or completed orders.
+      x-permission: orders.read
+      responses:
+        '200':
+          description: Invoice details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/OrderInvoice' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /orders/{id}/payments:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Orders]
+      summary: List payments for order
+      x-permission: payments.read
+      responses:
+        '200':
+          description: Payment list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PaymentDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    post:
+      tags: [Orders]
+      summary: Record payment against order
+      description: Records customer payment, rejects overpayment, updates order balance and payment status.
+      x-permission: payments.record_customer
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordPaymentInput' }
+      responses:
+        '200':
+          description: Payment replayed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '201':
+          description: Payment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /orders/{id}/refunds:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Orders]
+      summary: Record refund for order
+      description: Records customer refund against cancelled order or return credit.
+      x-permission: payments.refund
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RecordRefundInput' }
+      responses:
+        '200':
+          description: Refund replayed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '201':
+          description: Refund created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /payments:
+    get:
+      tags: [Payments]
+      summary: List payments
+      description: Paginated payment ledger with filters.
+      x-permission: payments.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Limit'
+        - name: sortBy
+          in: query
+          schema:
+            type: string
+            enum: [paymentNumber, createdAt, paidAt, amount]
+            default: createdAt
+        - $ref: '#/components/parameters/SortDir'
+        - name: orderId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: purchaseId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: paymentMethodId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: type
+          in: query
+          schema: { type: string, example: 'PAYMENT,REFUND,REVERSAL' }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Paginated payments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PaymentDetail' }
+                  meta: { $ref: '#/components/schemas/PaginationMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /payments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Payments]
+      summary: Payment detail
+      x-permission: payments.read
+      responses:
+        '200':
+          description: Payment detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /payments/{id}/reverse:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Payments]
+      summary: Reverse a payment or refund
+      description: Voids the original payment/refund record with an append-only reversal row and adjusts balances.
+      x-permission: payments.reverse
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReversePaymentInput' }
+      responses:
+        '200':
+          description: Reversal replayed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '201':
+          description: Reversal created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1829,6 +2306,211 @@ components:
       description: Unique client key for idempotent operations (BR-IDEM-01).
 
   schemas:
+    OrderListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderNumber: { type: string, example: SO-000001 }
+        invoiceNumber: { type: string, nullable: true, example: INV-000001 }
+        customerId: { type: string, format: uuid, nullable: true }
+        customerName: { type: string, nullable: true, example: John Doe }
+        customerPhone: { type: string, nullable: true }
+        status: { type: string, enum: [DRAFT, CONFIRMED, SHIPPED, DELIVERED, COMPLETED, CANCELLED] }
+        paymentStatus: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED] }
+        subtotal: { type: string, example: '100.00' }
+        discountAmount: { type: string, example: '10.00' }
+        taxAmount: { type: string, example: '0.00' }
+        totalAmount: { type: string, example: '90.00' }
+        paidAmount: { type: string, example: '90.00' }
+        balanceDue: { type: string, example: '0.00' }
+        itemsCount: { type: integer, example: 2 }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    OrderItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        lineNo: { type: integer, example: 1 }
+        productName: { type: string, example: Widget A }
+        productSku: { type: string, example: WGT-A }
+        unit: { type: string, example: pcs }
+        quantity: { type: integer, example: 2 }
+        unitPrice: { type: string, example: '25.00' }
+        unitCost: { type: string, nullable: true, example: '15.0000' }
+        discountAmount: { type: string, example: '0.00' }
+        allocatedDiscount: { type: string, example: '0.00' }
+        taxRate: { type: string, example: '0' }
+        taxAmount: { type: string, example: '0.00' }
+        lineTotal: { type: string, example: '50.00' }
+
+    OrderDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderNumber: { type: string, example: SO-000001 }
+        invoiceNumber: { type: string, nullable: true, example: INV-000001 }
+        customerId: { type: string, format: uuid, nullable: true }
+        customerName: { type: string, nullable: true }
+        customerPhone: { type: string, nullable: true }
+        customerAddress: { type: string, nullable: true }
+        status: { type: string, enum: [DRAFT, CONFIRMED, SHIPPED, DELIVERED, COMPLETED, CANCELLED] }
+        paymentStatus: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED] }
+        subtotal: { type: string, example: '100.00' }
+        discountType: { type: string, enum: [FIXED, PERCENTAGE], nullable: true }
+        discountValue: { type: string, nullable: true }
+        discountAmount: { type: string, example: '0.00' }
+        taxAmount: { type: string, example: '0.00' }
+        totalAmount: { type: string, example: '100.00' }
+        paidAmount: { type: string, example: '0.00' }
+        refundedAmount: { type: string, example: '0.00' }
+        returnedAmount: { type: string, example: '0.00' }
+        balanceDue: { type: string, example: '100.00' }
+        notes: { type: string, nullable: true }
+        carrier: { type: string, nullable: true }
+        trackingNumber: { type: string, nullable: true }
+        confirmedAt: { type: string, format: date-time, nullable: true }
+        shippedAt: { type: string, format: date-time, nullable: true }
+        deliveredAt: { type: string, format: date-time, nullable: true }
+        completedAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        cancellationReason: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        customer: { type: object, nullable: true }
+        createdBy: { $ref: '#/components/schemas/PublicUser' }
+        confirmedBy: { $ref: '#/components/schemas/PublicUser' }
+        completedBy: { $ref: '#/components/schemas/PublicUser' }
+        cancelledBy: { $ref: '#/components/schemas/PublicUser' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        payments:
+          type: array
+          items: { $ref: '#/components/schemas/PaymentDetail' }
+
+    OrderInvoice:
+      type: object
+      properties:
+        invoiceNumber: { type: string, example: INV-000001 }
+        status: { type: string, enum: [ISSUED, CANCELLED] }
+        issueDate: { type: string, format: date-time, nullable: true }
+        dueDate: { type: string, format: date-time, nullable: true }
+        orderNumber: { type: string, example: SO-000001 }
+        orderStatus: { type: string }
+        paymentStatus: { type: string }
+        business: { type: object }
+        customer: { type: object }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/OrderItem' }
+        subtotal: { type: string }
+        discountAmount: { type: string }
+        taxAmount: { type: string }
+        totalAmount: { type: string }
+        paidAmount: { type: string }
+        balanceDue: { type: string }
+
+    PaymentDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        paymentNumber: { type: string, example: PAY-000001 }
+        type: { type: string, enum: [PAYMENT, REFUND, REVERSAL] }
+        orderId: { type: string, format: uuid, nullable: true }
+        purchaseId: { type: string, format: uuid, nullable: true }
+        amount: { type: string, example: '50.00' }
+        paidAt: { type: string, format: date-time }
+        reference: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        reversedPaymentId: { type: string, format: uuid, nullable: true }
+        idempotencyKey: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        paymentMethod:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            code: { type: string, example: CASH }
+            name: { type: string, example: Cash }
+        recordedBy: { $ref: '#/components/schemas/PublicUser' }
+
+    CreateOrderItemInput:
+      type: object
+      required: [productId, quantity]
+      properties:
+        productId: { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, example: 2 }
+        unitPrice: { type: string, example: '25.00' }
+        discountAmount: { type: string, example: '0.00' }
+        taxRate: { type: string, example: '0' }
+
+    CreateOrderInput:
+      type: object
+      required: [items]
+      properties:
+        customerId: { type: string, format: uuid, nullable: true }
+        customerName: { type: string, maxLength: 150 }
+        customerPhone: { type: string, maxLength: 30 }
+        customerAddress: { type: string, maxLength: 1000 }
+        notes: { type: string, maxLength: 5000 }
+        discountType: { type: string, enum: [FIXED, PERCENTAGE], nullable: true }
+        discountValue: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CreateOrderItemInput' }
+
+    UpdateOrderInput:
+      type: object
+      properties:
+        customerId: { type: string, format: uuid, nullable: true }
+        customerName: { type: string, maxLength: 150 }
+        customerPhone: { type: string, maxLength: 30 }
+        customerAddress: { type: string, maxLength: 1000 }
+        notes: { type: string, maxLength: 5000 }
+        discountType: { type: string, enum: [FIXED, PERCENTAGE], nullable: true }
+        discountValue: { type: string, nullable: true }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/CreateOrderItemInput' }
+
+    CancelOrderInput:
+      type: object
+      properties:
+        reason: { type: string, maxLength: 500 }
+
+    ShipOrderInput:
+      type: object
+      properties:
+        carrier: { type: string, maxLength: 100 }
+        trackingNumber: { type: string, maxLength: 100 }
+
+    RecordPaymentInput:
+      type: object
+      required: [paymentMethodId, amount]
+      properties:
+        paymentMethodId: { type: string, format: uuid }
+        amount: { type: string, example: '50.00' }
+        paidAt: { type: string, format: date-time }
+        reference: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 2000 }
+
+    RecordRefundInput:
+      type: object
+      required: [paymentMethodId, amount]
+      properties:
+        paymentMethodId: { type: string, format: uuid }
+        amount: { type: string, example: '50.00' }
+        paidAt: { type: string, format: date-time }
+        reference: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 2000 }
+
+    ReversePaymentInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
     PurchaseListItem:
       type: object
       properties:

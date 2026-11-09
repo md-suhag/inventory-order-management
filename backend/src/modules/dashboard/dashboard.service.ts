@@ -133,7 +133,7 @@ async function financials() {
     SELECT
       (SELECT COALESCE(SUM(stock_quantity * cost_price), 0) FROM products WHERE status <> 'ARCHIVED') AS inventory_value,
       (SELECT COALESCE(SUM(GREATEST(total_amount - returned_amount - (paid_amount - refunded_amount), 0)), 0)
-         FROM orders WHERE status IN ('CONFIRMED', 'COMPLETED')) AS customer_balance,
+         FROM orders WHERE status IN ('CONFIRMED', 'SHIPPED', 'DELIVERED', 'COMPLETED')) AS customer_balance,
       (SELECT COALESCE(SUM(GREATEST(total_amount - (paid_amount - refunded_amount), 0)), 0)
          FROM purchases WHERE status IN ('ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED')) AS supplier_balance`;
   const money = (v: Prisma.Decimal) => new Prisma.Decimal(v).toFixed(2);

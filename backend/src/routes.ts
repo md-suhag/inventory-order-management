@@ -7,6 +7,8 @@ import { healthRouter } from './modules/health/health.routes';
 import { productsRouter } from './modules/products/products.routes';
 import { purchasesRouter } from './modules/purchases/purchases.routes';
 import { inventoryRouter } from './modules/inventory/inventory.routes';
+import { ordersRouter } from './modules/orders/orders.routes';
+import { paymentsRouter } from './modules/payments/payments.routes';
 import { rolesRouter } from './modules/roles/roles.routes';
 import { suppliersRouter } from './modules/suppliers/suppliers.routes';
 import { usersRouter } from './modules/users/users.routes';
@@ -26,6 +28,8 @@ export const apiModules: { path: string; router: Router }[] = [
   { path: '/customers', router: customersRouter },
   { path: '/purchases', router: purchasesRouter },
   { path: '/inventory', router: inventoryRouter },
+  { path: '/orders', router: ordersRouter },
+  { path: '/payments', router: paymentsRouter },
 ];
 
 interface RouteLayer {

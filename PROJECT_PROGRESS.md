@@ -11,7 +11,7 @@ _Last updated: 2026-11-09_
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
 | 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
-| 5 · Orders & payments | ⏳ Next | Orders, invoices, payments, refunds, balances |
+| 5 · Orders & payments | 🟡 In progress | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ⏳ | |
 | 7 · Frontend | ⏳ | |
 | 8 · Testing & hardening | ⏳ | |
@@ -31,8 +31,8 @@ _Last updated: 2026-11-09_
 | Customers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
 | Purchases & receiving | ✅ | ✅ CRUD, confirm (`DRAFT` → `ORDERED`), cancel, atomic goods receipt with WAC blending, idempotency replay, receipt listing | – | ✅ |
 | Inventory | ✅ | ✅ overview with stock state & cost privacy gating, low-stock query, manual adjustments (`ADJUSTMENT_IN`/`OUT`), movement history & details | – | ✅ |
-| Orders & invoices | ✅ | – | – | – |
-| Payments | ✅ | – | – | – |
+| Orders & invoices | ✅ | ✅ CRUD, calculations, confirmation (stock deduction), cancellation, shipping, delivery, completion, printable invoice | – | ✅ |
+| Payments | ✅ | ✅ ledger, payments on orders, refunds, reversals, idempotency replay, balance updates | – | ✅ |
 | Sales returns | ✅ | – | – | – |
 | Reports | ✅ | – | – | – |
 | Audit logs | ✅ | 🟡 recorder + immutability; read API in Phase 6 | – | 🟡 |
