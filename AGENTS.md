@@ -24,6 +24,7 @@ Mini Inventory & Order Management System — a portfolio-grade, single-business 
 - **Stop for owner review** at the checkpoints the brief requires (end of Phase 1 was one; ask before major architectural changes). Otherwise work independently; ask only when a business rule is genuinely ambiguous — and for open questions, choose the conventional/standard option and document it.
 - **Git:** one branch per phase (`phase-N/<short-name>`), **commit after each completed, specific task** (scaffold, a feature, its tests, docs), conventional-commit messages. Fast-forward merge into `main` at phase end. Never commit `.env` or secrets. Do not push or create remotes without the owner's permission.
 - A task is **done** only when: implemented (no placeholders), tests written and passing, `npm run lint` + `npm run typecheck` clean, OpenAPI + API_DESIGN updated for new routes, docs/progress updated. Report real results; never claim untested work is complete.
+- **Token economy:** read only the doc sections relevant to the task (grep for the `BR-`/`FR-`/`TD-` IDs or headings; don't read whole docs). While iterating, run only the affected test file (`npx vitest run <file>`). Before committing, run the full checks once with minimal output: `npm test -- --reporter=dot`, `npm run lint`, `npm run typecheck`. On failure, rerun just the failing file for details.
 - Do not add infrastructure (Redis, queues, microservices), multi-tenancy, multi-warehouse or ERP features unless the owner approves.
 
 ## 4. Owner decisions (Phase 1 review, 2026-11-08)
