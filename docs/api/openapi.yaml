@@ -966,6 +966,113 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /products/{id}/images:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Products]
+      summary: Upload product images
+      description: "Multipart field `images` (1–5 files). JPEG, PNG or WebP verified by magic bytes (the sent content type is ignored), ≤ 2 MB each, at most 5 images per product (FR-PROD-07, NFR-SEC-10). Returns all images of the product in display order."
+      x-permission: products.manage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images:
+                  type: array
+                  maxItems: 5
+                  items: { type: string, format: binary }
+      responses:
+        '201':
+          description: Images of the product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductImage' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413': { $ref: '#/components/responses/PayloadTooLarge' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /products/{id}/images/order:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    put:
+      tags: [Products]
+      summary: Reorder product images
+      description: "`imageIds` must list every image of the product exactly once; the first becomes the primary image."
+      x-permission: products.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [imageIds]
+              properties:
+                imageIds:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  items: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Images in the new order
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/ProductImage' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /products/{id}/images/{imageId}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+      - name: imageId
+        in: path
+        required: true
+        schema: { type: string, format: uuid }
+    get:
+      tags: [Products]
+      summary: Download an image
+      description: Served with the stored content type and `X-Content-Type-Options nosniff`.
+      x-permission: products.read
+      responses:
+        '200':
+          description: Image bytes
+          content:
+            image/jpeg: { schema: { type: string, format: binary } }
+            image/png: { schema: { type: string, format: binary } }
+            image/webp: { schema: { type: string, format: binary } }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [Products]
+      summary: Delete an image
+      description: Remaining images are renumbered; the file is removed from storage.
+      x-permission: products.manage
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /suppliers:
     get:
       tags: [Suppliers]
@@ -1669,6 +1776,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: RATE_LIMITED, message: 'Too many authentication attempts, please try again later', requestId: 3f1c… } }
+    PayloadTooLarge:
+      description: Request or uploaded file too large
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
     Referenced:
       description: The record is still referenced by other records
       content:

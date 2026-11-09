@@ -134,6 +134,10 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | DELETE | `/products/:id` | ✔ | `products.manage` | Only without purchase/order lines or movements (409 `REFERENCED`); removes image files |
 | POST | `/products/:id/archive` | ✔ | `products.manage` | Idempotent |
 | POST | `/products/:id/unarchive` | ✔ | `products.manage` | Idempotent; sets ACTIVE |
+| POST | `/products/:id/images` | ✔ | `products.manage` | Multipart `images` (1–5 files); JPEG/PNG/WebP by magic bytes, ≤ 2 MB each (413), ≤ 5 per product (422) |
+| PUT | `/products/:id/images/order` | ✔ | `products.manage` | `imageIds` lists every image once; first = primary |
+| GET | `/products/:id/images/:imageId` | ✔ | `products.read` | Image bytes with stored content type, `nosniff` |
+| DELETE | `/products/:id/images/:imageId` | ✔ | `products.manage` | Renumbers the rest; removes the file |
 | GET | `/suppliers` | ✔ | `suppliers.read` | Search name/contact/phone/email; filter `status`; sort `name`, `createdAt` |
 | POST | `/suppliers` | ✔ | `suppliers.manage` | Email lower-cased; empty optional fields stored as null |
 | GET | `/suppliers/:id` | ✔ | `suppliers.read` | With `summary`: purchaseCount, totalPurchased, totalPaid, outstandingBalance (active purchases, BR-PAY-08) |

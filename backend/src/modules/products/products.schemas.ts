@@ -70,3 +70,7 @@ export const updateProductSchema = z
 export type ListProductsQuery = z.infer<typeof listProductsQuerySchema>;
 export type CreateProductInput = z.infer<typeof createProductSchema>;
 export type UpdateProductInput = z.infer<typeof updateProductSchema>;
+
+export const imageParamsSchema = z.object({ id: uuidSchema, imageId: uuidSchema });
+
+export const reorderImagesSchema = z.object({ imageIds: z.array(uuidSchema).min(1).max(5) });
