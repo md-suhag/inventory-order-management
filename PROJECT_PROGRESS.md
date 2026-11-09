@@ -10,8 +10,8 @@ _Last updated: 2026-11-09_
 | 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports); review decisions applied |
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
 | 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
-| 4 · Purchase & inventory | 🟡 Complete — pending owner review (`phase-4/purchase-inventory`) | Purchases, goods receipts, inventory management & adjustments, movements |
-| 5 · Orders & payments | ⏳ | |
+| 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
+| 5 · Orders & payments | ⏳ Next | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ⏳ | |
 | 7 · Frontend | ⏳ | |
 | 8 · Testing & hardening | ⏳ | |
@@ -76,8 +76,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–3 complete |
-| `phase-4/purchase-inventory` | Phase 4 (Purchases, Receiving, Inventory & Adjustments) |
+| `main` | Phase 0–4 complete |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
