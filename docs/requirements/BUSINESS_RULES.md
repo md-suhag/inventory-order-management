@@ -19,6 +19,7 @@ These rules are normative: services must implement them, tests must cover them, 
 - **BR-USER-03** A user cannot change their own role or deactivate themselves.
 - **BR-USER-04** Deactivation, role change, password change/reset revoke refresh tokens and bump `token_version` (invalidates outstanding access tokens).
 - **BR-USER-05** `ADMIN` role permissions are immutable; system roles cannot be deleted; a role with users cannot be deleted.
+- **BR-USER-06** Only an administrator can create, edit, (de)activate or change the role of an `ADMIN` user, or assign the `ADMIN` role — holding `users.manage` on another role is not enough (prevents privilege escalation). _Added Phase 3._
 - **BR-AUTH-01** 5 consecutive failed logins lock the account for 15 minutes; a successful login resets the counter.
 - **BR-AUTH-02** Refresh token reuse (presenting a token that was already rotated, after a 10-second grace window) revokes the entire token family.
 

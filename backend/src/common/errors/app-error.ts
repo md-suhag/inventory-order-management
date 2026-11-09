@@ -60,3 +60,6 @@ export const conflict = (message: string, code: ErrorCode = ErrorCode.CONFLICT, 
   new AppError(409, code, message, details);
 export const businessRule = (message: string, details?: ErrorDetail[]) =>
   new AppError(422, ErrorCode.BUSINESS_RULE_VIOLATION, message, details);
+/** A referenced id in the request body does not exist (e.g. unknown roleId). */
+export const invalidReference = (field: string, message = 'Referenced record does not exist') =>
+  new AppError(422, ErrorCode.INVALID_REFERENCE, message, [{ field, message }]);

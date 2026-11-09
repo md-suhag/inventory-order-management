@@ -2,6 +2,7 @@ import type { Router } from 'express';
 import { authRouter } from './modules/auth/auth.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { rolesRouter } from './modules/roles/roles.routes';
+import { usersRouter } from './modules/users/users.routes';
 
 export const API_PREFIX = '/api/v1';
 
@@ -9,6 +10,7 @@ export const API_PREFIX = '/api/v1';
 export const apiModules: { path: string; router: Router }[] = [
   { path: '/health', router: healthRouter },
   { path: '/auth', router: authRouter },
+  { path: '/users', router: usersRouter },
   { path: '/roles', router: rolesRouter },
 ];
 

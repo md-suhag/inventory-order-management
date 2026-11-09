@@ -19,6 +19,8 @@ tags:
   - name: Health
   - name: Auth
     description: Login, session tokens, profile and password management
+  - name: Users
+    description: User administration (accounts, roles, activation)
   - name: Roles
     description: Roles and the permission catalogue
 
@@ -302,6 +304,175 @@ paths:
         '401': { $ref: '#/components/responses/Unauthenticated' }
         '422': { $ref: '#/components/responses/ValidationError' }
 
+  /users:
+    get:
+      tags: [Users]
+      summary: List users
+      x-permission: users.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          description: Case-insensitive match on name or email
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          description: 'Up to 3 keys from: name, email, createdAt, lastLoginAt (default createdAt:desc)'
+          schema: { type: string, example: 'name:asc' }
+        - name: roleId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: isActive
+          in: query
+          schema: { type: string, enum: ['true', 'false'] }
+      responses:
+        '200':
+          description: Page of users
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/User' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Users]
+      summary: Create a user
+      description: |
+        Creates an active user with an initial password (shared out of band; the user can change it or
+        use the reset flow). Only an administrator can create a user with the ADMIN role.
+      x-permission: users.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email, roleId, password]
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                email: { type: string, format: email, description: Stored lower-cased }
+                phone: { type: string, pattern: '^[0-9+()\-\s]{5,30}$' }
+                roleId: { type: string, format: uuid }
+                password: { $ref: '#/components/schemas/Password' }
+            example: { name: Sam Staff, email: sam@example.com, roleId: 0190f3a0-1111-7000-8000-000000000000, password: Welcome123 }
+      responses:
+        '201':
+          description: Created user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Users]
+      summary: Get a user
+      x-permission: users.read
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Users]
+      summary: Update a user (name, phone, role)
+      description: |
+        Changing the role revokes all sessions of that user. `BUSINESS_RULE_VIOLATION` when changing your
+        own role or demoting the last active administrator. Only administrators can modify administrator
+        accounts or assign the ADMIN role (`FORBIDDEN`). Email cannot be changed (unknown fields are ignored).
+      x-permission: users.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                phone: { type: string, nullable: true, pattern: '^[0-9+()\-\s]{5,30}$' }
+                roleId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /users/{id}/activate:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Users]
+      summary: Activate a user
+      description: Idempotent. Also clears a login lockout.
+      x-permission: users.manage
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /users/{id}/deactivate:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Users]
+      summary: Deactivate a user
+      description: |
+        Idempotent. Revokes all sessions immediately. `BUSINESS_RULE_VIOLATION` for your own account or
+        the last active administrator.
+      x-permission: users.manage
+      responses:
+        '200':
+          description: User
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/User' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
   /roles/permissions:
     get:
       tags: [Roles]
@@ -330,6 +501,21 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+
+  parameters:
+    Id:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
 
   schemas:
     Password:
@@ -475,3 +661,15 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: RATE_LIMITED, message: 'Too many authentication attempts, please try again later', requestId: 3f1c… } }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: NOT_FOUND, message: User not found, requestId: 3f1c… } }
+    BusinessRuleOrValidation:
+      description: Field validation (`VALIDATION_ERROR`), unknown referenced id (`INVALID_REFERENCE`) or business rule violation (`BUSINESS_RULE_VIOLATION`)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: BUSINESS_RULE_VIOLATION, message: At least one active administrator must remain, requestId: 3f1c… } }

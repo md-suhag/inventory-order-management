@@ -50,7 +50,7 @@ Machine-readable contract: [`openapi.yaml`](openapi.yaml) (served at `/api/docs`
 | 404 | `NOT_FOUND` | Unknown route or resource |
 | 409 | `CONFLICT`, `DUPLICATE`, `REFERENCED`, `INVALID_STATE_TRANSITION`, `TRANSACTION_CONFLICT` | Unique conflicts, referenced records, wrong document status, lock conflicts |
 | 413 | `PAYLOAD_TOO_LARGE` | Body > 100 kB |
-| 422 | `VALIDATION_ERROR`, `BUSINESS_RULE_VIOLATION`, `IDEMPOTENCY_KEY_REUSED` | Field validation (all invalid fields listed); business rule failures (e.g. insufficient stock, overpayment) |
+| 422 | `VALIDATION_ERROR`, `INVALID_REFERENCE`, `BUSINESS_RULE_VIOLATION`, `IDEMPOTENCY_KEY_REUSED` | Field validation (all invalid fields listed); a referenced id in the body does not exist (e.g. `roleId`); business rule failures (e.g. insufficient stock, overpayment, last active admin) |
 | 429 | `RATE_LIMITED` | Rate limit exceeded |
 | 500 | `INTERNAL_ERROR` | Unexpected; details never exposed in production |
 
@@ -108,6 +108,12 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | GET | `/auth/me` | ✔ | – | Profile + effective permissions |
 | PATCH | `/auth/me` | ✔ | – | Name, phone |
 | POST | `/auth/change-password` | ✔ | – | Returns a fresh token pair |
+| GET | `/users` | ✔ | `users.read` | Search name/email; filters `roleId`, `isActive`; sort `name`, `email`, `createdAt`, `lastLoginAt` |
+| POST | `/users` | ✔ | `users.manage` | Active user with initial password; ADMIN role only assignable by an admin |
+| GET | `/users/:id` | ✔ | `users.read` | |
+| PATCH | `/users/:id` | ✔ | `users.manage` | Name, phone, role; role change revokes sessions; not own role; last active admin protected |
+| POST | `/users/:id/activate` | ✔ | `users.manage` | Idempotent; clears lockout |
+| POST | `/users/:id/deactivate` | ✔ | `users.manage` | Idempotent; revokes sessions; not self; last active admin protected |
 | GET | `/roles/permissions` | ✔ | `roles.read` | Permission catalogue |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.
