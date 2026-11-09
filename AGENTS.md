@@ -76,4 +76,9 @@ On Windows Git Bash, prefix `docker run -v ...` commands with `MSYS_NO_PATHCONV=
 
 ## 8. Communication with the owner
 
-The owner writes in Banglish (romanised Bengali + English); reply in the same style, technical terms in English. They are an experienced JS/TS/Node/React developer: no tutorials, explain only important decisions briefly (~70–80% implementation, 20–30% explanation). Be explicit about which phase you are in and why you run verification commands.
+The owner may write in Banglish (romanised Bengali + English), but **always reply in English**.
+
+- **Be concise and to the point.** Say only what is needed; avoid unnecessary tokens.
+- **No teaching or tutorials.** The owner is an experienced JS/TS/Node/React developer — focus on doing the work.
+- **Report when work is done:** what changed, test/lint results, commit hash, and anything that needs an owner decision. Skip play-by-play narration.
+- Mention a decision only when it matters (new business rule, trade-off, deviation from docs), in one or two lines.
