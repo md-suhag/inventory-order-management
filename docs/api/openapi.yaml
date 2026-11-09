@@ -25,6 +25,10 @@ tags:
     description: Roles and the permission catalogue
   - name: Categories
     description: Product categories
+  - name: Suppliers
+    description: Suppliers and their purchase balances
+  - name: Customers
+    description: Customers and their order balances
 
 security:
   - bearerAuth: []
@@ -794,6 +798,314 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: List suppliers
+      x-permission: suppliers.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          description: Case-insensitive match on name, contact person, phone or email
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          description: 'Up to 3 keys from: name, createdAt (default name:asc)'
+          schema: { type: string }
+        - name: status
+          in: query
+          description: Comma list or repeated
+          schema: { type: string, example: 'ACTIVE' }
+      responses:
+        '200':
+          description: Page of suppliers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Supplier' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Suppliers]
+      summary: Create a supplier
+      x-permission: suppliers.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierInput' }
+      responses:
+        '201':
+          description: Created supplier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Supplier' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /suppliers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Suppliers]
+      summary: Get a supplier with balance summary
+      description: "`summary` covers ORDERED / PARTIALLY_RECEIVED / RECEIVED purchases; outstanding = Σ max(total − net paid, 0) (BR-PAY-08)."
+      x-permission: suppliers.read
+      responses:
+        '200':
+          description: Supplier with summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SupplierDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Suppliers]
+      summary: Update a supplier
+      description: At least one field. Send an optional field as an empty string or null to clear it.
+      x-permission: suppliers.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SupplierUpdate' }
+      responses:
+        '200':
+          description: Updated supplier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Supplier' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Suppliers]
+      summary: Delete an unreferenced supplier
+      description: Returns `409 REFERENCED` once any purchase references the supplier — archive it instead.
+      x-permission: suppliers.manage
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Referenced' }
+
+  /suppliers/{id}/archive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Suppliers]
+      summary: Archive a supplier
+      description: Idempotent. Archived suppliers keep their history but cannot receive new purchases.
+      x-permission: suppliers.manage
+      responses:
+        '200':
+          description: Supplier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Supplier' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /suppliers/{id}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Suppliers]
+      summary: Unarchive a supplier
+      description: Idempotent.
+      x-permission: suppliers.manage
+      responses:
+        '200':
+          description: Supplier
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Supplier' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /customers:
+    get:
+      tags: [Customers]
+      summary: List customers
+      x-permission: customers.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          description: Case-insensitive match on name, phone or email
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          description: 'Up to 3 keys from: name, createdAt (default name:asc)'
+          schema: { type: string }
+        - name: status
+          in: query
+          description: Comma list or repeated
+          schema: { type: string, example: 'ACTIVE' }
+      responses:
+        '200':
+          description: Page of customers
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Customer' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Customers]
+      summary: Create a customer
+      x-permission: customers.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerInput' }
+      responses:
+        '201':
+          description: Created customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /customers/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Customers]
+      summary: Get a customer with balance summary
+      description: "`summary` covers CONFIRMED / COMPLETED orders; sales are net of returns; outstanding = Σ max(total − returned − net paid, 0) (BR-PAY-08)."
+      x-permission: customers.read
+      responses:
+        '200':
+          description: Customer with summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/CustomerDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Customers]
+      summary: Update a customer
+      description: At least one field. Send an optional field as an empty string or null to clear it.
+      x-permission: customers.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CustomerUpdate' }
+      responses:
+        '200':
+          description: Updated customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Customers]
+      summary: Delete an unreferenced customer
+      description: Returns `409 REFERENCED` once any order references the customer — archive it instead.
+      x-permission: customers.archive
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Referenced' }
+
+  /customers/{id}/archive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Customers]
+      summary: Archive a customer
+      description: Idempotent. Archived customers cannot be used on new orders.
+      x-permission: customers.archive
+      responses:
+        '200':
+          description: Customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /customers/{id}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Customers]
+      summary: Unarchive a customer
+      description: Idempotent.
+      x-permission: customers.archive
+      responses:
+        '200':
+          description: Customer
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Customer' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -905,6 +1217,101 @@ components:
         productCount: { type: integer, example: 12 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    SupplierInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        phone: { type: string, pattern: '^[0-9+()\-\s]{5,30}$', nullable: true }
+        email: { type: string, format: email, maxLength: 254, nullable: true }
+        address: { type: string, maxLength: 2000, nullable: true }
+        notes: { type: string, maxLength: 5000, nullable: true }
+        contactPerson: { type: string, maxLength: 100, nullable: true }
+
+    SupplierUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        phone: { type: string, pattern: '^[0-9+()\-\s]{5,30}$', nullable: true }
+        email: { type: string, format: email, maxLength: 254, nullable: true }
+        address: { type: string, maxLength: 2000, nullable: true }
+        notes: { type: string, maxLength: 5000, nullable: true }
+        contactPerson: { type: string, maxLength: 100, nullable: true }
+
+    Supplier:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        contactPerson: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    SupplierDetail:
+      allOf:
+        - $ref: '#/components/schemas/Supplier'
+        - type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                purchaseCount: { type: integer }
+                totalPurchased: { type: string, example: '0.00' }
+                totalPaid: { type: string, example: '0.00' }
+                outstandingBalance: { type: string, example: '0.00' }
+
+    CustomerInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        phone: { type: string, pattern: '^[0-9+()\-\s]{5,30}$', nullable: true }
+        email: { type: string, format: email, maxLength: 254, nullable: true }
+        address: { type: string, maxLength: 2000, nullable: true }
+        notes: { type: string, maxLength: 5000, nullable: true }
+
+    CustomerUpdate:
+      type: object
+      minProperties: 1
+      properties:
+        name: { type: string, minLength: 1, maxLength: 150 }
+        phone: { type: string, pattern: '^[0-9+()\-\s]{5,30}$', nullable: true }
+        email: { type: string, format: email, maxLength: 254, nullable: true }
+        address: { type: string, maxLength: 2000, nullable: true }
+        notes: { type: string, maxLength: 5000, nullable: true }
+
+    Customer:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        phone: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CustomerDetail:
+      allOf:
+        - $ref: '#/components/schemas/Customer'
+        - type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                orderCount: { type: integer }
+                totalSales: { type: string, example: '0.00' }
+                totalPaid: { type: string, example: '0.00' }
+                outstandingBalance: { type: string, example: '0.00' }
 
     PermissionInfo:
       type: object

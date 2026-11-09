@@ -131,7 +131,7 @@ All figures come from live database aggregates; date range defaults to the curre
 | ID | Requirement |
 |----|-------------|
 | FR-CUST-01 | Create/update customers: name, phone, email, address, notes. |
-| FR-CUST-02 | Archive/unarchive; archived customers cannot be used on new orders. |
+| FR-CUST-02 | Archive/unarchive; archived customers cannot be used on new orders. Hard delete only while no order references the customer (same `customers.archive` permission). |
 | FR-CUST-03 | Search (name, phone, email) and paginate. |
 | FR-CUST-04 | Customer detail: order history, payment history, outstanding balance. |
 | FR-CUST-05 | Orders may be placed for a **walk-in customer** (no customer record); an optional name/phone is stored only on the order. |

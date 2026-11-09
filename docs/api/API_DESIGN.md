@@ -127,5 +127,19 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | DELETE | `/categories/:id` | ✔ | `categories.manage` | Only when no product references it (409 `REFERENCED`) |
 | POST | `/categories/:id/archive` | ✔ | `categories.manage` | Idempotent |
 | POST | `/categories/:id/unarchive` | ✔ | `categories.manage` | Idempotent |
+| GET | `/suppliers` | ✔ | `suppliers.read` | Search name/contact/phone/email; filter `status`; sort `name`, `createdAt` |
+| POST | `/suppliers` | ✔ | `suppliers.manage` | Email lower-cased; empty optional fields stored as null |
+| GET | `/suppliers/:id` | ✔ | `suppliers.read` | With `summary`: purchaseCount, totalPurchased, totalPaid, outstandingBalance (active purchases, BR-PAY-08) |
+| PATCH | `/suppliers/:id` | ✔ | `suppliers.manage` | Any subset of fields; ""/null clears optional fields |
+| DELETE | `/suppliers/:id` | ✔ | `suppliers.manage` | Only while no purchase references it (409 `REFERENCED`) |
+| POST | `/suppliers/:id/archive` | ✔ | `suppliers.manage` | Idempotent; archived suppliers cannot receive new purchases |
+| POST | `/suppliers/:id/unarchive` | ✔ | `suppliers.manage` | Idempotent |
+| GET | `/customers` | ✔ | `customers.read` | Search name/phone/email; filter `status`; sort `name`, `createdAt` |
+| POST | `/customers` | ✔ | `customers.manage` |  |
+| GET | `/customers/:id` | ✔ | `customers.read` | With `summary`: orderCount, totalSales (net of returns), totalPaid, outstandingBalance (confirmed/completed orders) |
+| PATCH | `/customers/:id` | ✔ | `customers.manage` | Any subset of fields; ""/null clears optional fields |
+| DELETE | `/customers/:id` | ✔ | `customers.archive` | Only while no order references it (409 `REFERENCED`) |
+| POST | `/customers/:id/archive` | ✔ | `customers.archive` | Idempotent; archived customers cannot be used on new orders |
+| POST | `/customers/:id/unarchive` | ✔ | `customers.archive` | Idempotent |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.
