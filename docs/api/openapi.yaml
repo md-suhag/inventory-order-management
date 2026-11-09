@@ -23,6 +23,8 @@ tags:
     description: User administration (accounts, roles, activation)
   - name: Roles
     description: Roles and the permission catalogue
+  - name: Dashboard
+    description: Operational and financial dashboard figures
   - name: Categories
     description: Product categories
   - name: Products
@@ -637,6 +639,34 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Referenced' }
         '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /dashboard/summary:
+    get:
+      tags: [Dashboard]
+      summary: Operational dashboard summary
+      description: "Counts, order status in range, pending/draft orders, low/out-of-stock alerts (FR-DASH-01..05). `recentOrders` needs `orders.read`, `recentPurchases` needs `purchases.read`, `financials` needs `dashboard.financials`; sections the caller may not see are omitted. Net sales, gross profit and purchase value tiles arrive with the order/purchase modules."
+      x-permission: dashboard.read
+      parameters:
+        - name: from
+          in: query
+          description: Inclusive start date (YYYY-MM-DD) in the business timezone; default first day of the current month
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          description: Inclusive end date; default last day of the current month
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/DashboardSummary' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
 
   /categories:
     get:
@@ -1474,6 +1504,85 @@ components:
         userCount: { type: integer, example: 3 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    DashboardSummary:
+      type: object
+      properties:
+        range:
+          type: object
+          properties:
+            from: { type: string, format: date }
+            to: { type: string, format: date }
+            timezone: { type: string, example: Asia/Dhaka }
+        counts:
+          type: object
+          properties:
+            activeProducts: { type: integer }
+            activeCustomers: { type: integer }
+            activeSuppliers: { type: integer }
+        orders:
+          type: object
+          properties:
+            createdInRange:
+              type: object
+              properties:
+                DRAFT: { type: integer }
+                CONFIRMED: { type: integer }
+                COMPLETED: { type: integer }
+                CANCELLED: { type: integer }
+            pending: { type: integer, description: Orders currently CONFIRMED }
+            drafts: { type: integer, description: Orders currently DRAFT }
+        stock:
+          type: object
+          properties:
+            lowStock: { type: integer }
+            outOfStock: { type: integer }
+            items:
+              type: array
+              description: Up to 10 out-of-stock / low-stock products, lowest stock first
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  sku: { type: string }
+                  name: { type: string }
+                  stockQuantity: { type: integer }
+                  lowStockThreshold: { type: integer }
+                  stockState: { type: string, enum: [LOW, OUT] }
+        recentOrders:
+          type: array
+          description: Latest 5 orders (only with orders.read)
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              orderNumber: { type: string }
+              status: { type: string }
+              paymentStatus: { type: string }
+              totalAmount: { type: string }
+              customerName: { type: string, nullable: true }
+              customer: { type: object, nullable: true, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+              createdAt: { type: string, format: date-time }
+        recentPurchases:
+          type: array
+          description: Latest 5 purchases (only with purchases.read)
+          items:
+            type: object
+            properties:
+              id: { type: string, format: uuid }
+              purchaseNumber: { type: string }
+              status: { type: string }
+              paymentStatus: { type: string }
+              totalAmount: { type: string }
+              supplier: { type: object, properties: { id: { type: string, format: uuid }, name: { type: string } } }
+              createdAt: { type: string, format: date-time }
+        financials:
+          type: object
+          description: Only with dashboard.financials (BUSINESS_RULES §9)
+          properties:
+            inventoryValue: { type: string, example: '1250.00' }
+            outstandingCustomerBalance: { type: string, example: '0.00' }
+            outstandingSupplierBalance: { type: string, example: '0.00' }
 
     CategoryInput:
       type: object

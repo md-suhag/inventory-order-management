@@ -120,6 +120,7 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | GET | `/roles/:id` | ✔ | `roles.read` | |
 | PATCH | `/roles/:id` | ✔ | `roles.manage` | `permissions` replaces the set; ADMIN immutable; system roles not renamable; non-admins not on own role |
 | DELETE | `/roles/:id` | ✔ | `roles.manage` | Custom roles only; 409 `REFERENCED` while users hold it |
+| GET | `/dashboard/summary` | ✔ | `dashboard.read` | `from`/`to` dates in business timezone (default current month); counts, orders by status, low/out of stock; `recentOrders` (`orders.read`), `recentPurchases` (`purchases.read`), `financials` (`dashboard.financials`) |
 | GET | `/categories` | ✔ | `categories.read` | With `productCount`; search name/description; filter `status`; sort `name`, `createdAt`, `productCount` |
 | POST | `/categories` | ✔ | `categories.manage` | Names unique case-insensitively |
 | GET | `/categories/:id` | ✔ | `categories.read` | |

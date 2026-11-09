@@ -2,6 +2,7 @@ import type { Router } from 'express';
 import { authRouter } from './modules/auth/auth.routes';
 import { customersRouter } from './modules/customers/customers.routes';
 import { categoriesRouter } from './modules/categories/categories.routes';
+import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { productsRouter } from './modules/products/products.routes';
 import { rolesRouter } from './modules/roles/roles.routes';
@@ -16,6 +17,7 @@ export const apiModules: { path: string; router: Router }[] = [
   { path: '/auth', router: authRouter },
   { path: '/users', router: usersRouter },
   { path: '/roles', router: rolesRouter },
+  { path: '/dashboard', router: dashboardRouter },
   { path: '/categories', router: categoriesRouter },
   { path: '/products', router: productsRouter },
   { path: '/suppliers', router: suppliersRouter },
