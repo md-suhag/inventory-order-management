@@ -26,7 +26,7 @@ _Last updated: 2026-11-09_
 | Users & RBAC | ✅ | ✅ user admin API (last-admin guard, BR-USER-02..07), role CRUD + permission editing | – | ✅ |
 | Dashboard | ✅ | – | – | – |
 | Products | ✅ | – | – | – |
-| Categories | ✅ | – | – | – |
+| Categories | ✅ | ✅ CRUD, archive/unarchive, delete only when unused | – | ✅ |
 | Suppliers | ✅ | – | – | – |
 | Customers | ✅ | – | – | – |
 | Purchases & receiving | ✅ | – | – | – |
@@ -90,7 +90,7 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 | Suite | Tests | Result |
 |-------|-------|--------|
 | Unit | 39 | ✅ |
-| Integration (PostgreSQL 16) | 38 | ✅ |
+| Integration (PostgreSQL 16) | 67 | ✅ (2026-11-09) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
 | E2E | – | Phase 8 |
 

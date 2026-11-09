@@ -23,6 +23,8 @@ tags:
     description: User administration (accounts, roles, activation)
   - name: Roles
     description: Roles and the permission catalogue
+  - name: Categories
+    description: Product categories
 
 security:
   - bearerAuth: []
@@ -630,6 +632,168 @@ paths:
         '409': { $ref: '#/components/responses/Referenced' }
         '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
 
+  /categories:
+    get:
+      tags: [Categories]
+      summary: List categories with product counts
+      x-permission: categories.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          description: Case-insensitive match on name or description
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          description: 'Up to 3 keys from: name, createdAt, productCount (default name:asc)'
+          schema: { type: string }
+        - name: status
+          in: query
+          description: Comma list or repeated
+          schema: { type: string, example: 'ACTIVE' }
+      responses:
+        '200':
+          description: Page of categories
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Category' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Categories]
+      summary: Create a category
+      description: Names are unique case-insensitively.
+      x-permission: categories.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CategoryInput' }
+            example: { name: Beverages, description: Cold drinks and juices }
+      responses:
+        '201':
+          description: Created category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /categories/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Categories]
+      summary: Get a category
+      x-permission: categories.read
+      responses:
+        '200':
+          description: Category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Categories]
+      summary: Rename / describe a category
+      description: Send `description` as an empty string or null to clear it.
+      x-permission: categories.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name: { type: string, minLength: 1, maxLength: 100 }
+                description: { type: string, maxLength: 2000, nullable: true }
+      responses:
+        '200':
+          description: Updated category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Categories]
+      summary: Delete an unused category
+      description: Returns `409 REFERENCED` while any product references it — archive it instead.
+      x-permission: categories.manage
+      responses:
+        '204': { description: Deleted }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Referenced' }
+
+  /categories/{id}/archive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Categories]
+      summary: Archive a category
+      description: Idempotent. Archived categories cannot be assigned to products; existing products keep the reference.
+      x-permission: categories.manage
+      responses:
+        '200':
+          description: Category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /categories/{id}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Categories]
+      summary: Unarchive a category
+      description: Idempotent.
+      x-permission: categories.manage
+      responses:
+        '200':
+          description: Category
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Category' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -721,6 +885,24 @@ components:
           items: { type: string }
           example: [inventory.read, purchases.receive]
         userCount: { type: integer, example: 3 }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    CategoryInput:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, minLength: 1, maxLength: 100 }
+        description: { type: string, maxLength: 2000, nullable: true }
+
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string, example: Beverages }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        productCount: { type: integer, example: 12 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 

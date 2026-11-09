@@ -1,5 +1,6 @@
 import type { Router } from 'express';
 import { authRouter } from './modules/auth/auth.routes';
+import { categoriesRouter } from './modules/categories/categories.routes';
 import { healthRouter } from './modules/health/health.routes';
 import { rolesRouter } from './modules/roles/roles.routes';
 import { usersRouter } from './modules/users/users.routes';
@@ -12,6 +13,7 @@ export const apiModules: { path: string; router: Router }[] = [
   { path: '/auth', router: authRouter },
   { path: '/users', router: usersRouter },
   { path: '/roles', router: rolesRouter },
+  { path: '/categories', router: categoriesRouter },
 ];
 
 interface RouteLayer {
