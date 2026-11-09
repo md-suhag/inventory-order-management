@@ -621,7 +621,7 @@ export async function reversePayment(
 export async function getPayment(id: string): Promise<PaymentDetail> {
   const payment = await prisma.payment.findUnique({
     where: { id },
-    include: paymentSelect,
+    select: paymentSelect,
   });
 
   if (!payment) throw notFound('Payment');
@@ -634,7 +634,7 @@ export async function listOrderPayments(orderId: string): Promise<PaymentDetail[
 
   const payments = await prisma.payment.findMany({
     where: { orderId },
-    include: paymentSelect,
+    select: paymentSelect,
     orderBy: { createdAt: 'desc' },
   });
 
@@ -676,7 +676,7 @@ export async function listPayments(query: ListPaymentsQuery): Promise<Paginated<
     async () => {
       const rows = await prisma.payment.findMany({
         ...args,
-        include: paymentSelect,
+        select: paymentSelect,
       });
       return rows.map(mapPayment);
     },

@@ -314,6 +314,6 @@ describe('Payments Module (Phase 5)', () => {
 
     const res = await api().get(PAYMENTS_BASE).set(bearer(manager)).query({ type: 'PAYMENT' }).expect(200);
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);
-    expect(res.body.meta).toHaveProperty('totalItems');
+    expect(res.body.meta).toHaveProperty('total');
   });
 });

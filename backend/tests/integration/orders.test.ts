@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it } from 'vitest';
 import { api, bearer, loginAs, type Session } from '../helpers/app';
 import { prisma, resetDatabase } from '../helpers/db';
@@ -334,7 +335,7 @@ describe('Orders Module (Phase 5)', () => {
     expect(movements[0]!.quantityChange).toBe(-4);
     expect(movements[1]!.type).toBe('SALE_CANCELLATION');
     expect(movements[1]!.quantityChange).toBe(4);
-    expect(movements[1]!.unitCost?.toString()).toBe('10.0000');
+    expect(new Prisma.Decimal(movements[1]!.unitCost!).toFixed(4)).toBe('10.0000');
   });
 
   it('fulfillment transitions: ship (CONFIRMED -> SHIPPED), deliver (SHIPPED -> DELIVERED), complete', async () => {
