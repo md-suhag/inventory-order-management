@@ -25,6 +25,8 @@ tags:
     description: Roles and the permission catalogue
   - name: Categories
     description: Product categories
+  - name: Products
+    description: Product catalogue, stock state and images
   - name: Suppliers
     description: Suppliers and their purchase balances
   - name: Customers
@@ -798,6 +800,172 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /products:
+    get:
+      tags: [Products]
+      summary: List products
+      description: "`costPrice` is omitted unless the caller holds `products.view_cost`."
+      x-permission: products.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          description: Case-insensitive match on name, SKU or barcode
+          schema: { type: string, maxLength: 100 }
+        - name: sort
+          in: query
+          description: 'Up to 3 keys from: name, sku, sellingPrice, stockQuantity, createdAt (default name:asc)'
+          schema: { type: string }
+        - name: status
+          in: query
+          description: 'Comma list or repeated: ACTIVE, INACTIVE, ARCHIVED'
+          schema: { type: string }
+        - name: stockState
+          in: query
+          description: 'Comma list or repeated: IN_STOCK, LOW, OUT (BR-PROD-04)'
+          schema: { type: string, example: 'LOW,OUT' }
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Page of products
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Product' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    post:
+      tags: [Products]
+      summary: Create a product
+      description: "Optional `openingStock` is recorded as an OPENING_STOCK movement at `costPrice` (FR-PROD-02). Sending `costPrice` requires `products.view_cost` (403 otherwise). The category must be active."
+      x-permission: products.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductInput' }
+            example: { sku: TEA-01, name: Green Tea, sellingPrice: '120.00', costPrice: '80.50', openingStock: 25 }
+      responses:
+        '201':
+          description: Created product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /products/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Products]
+      summary: Get a product with images and recent stock movements
+      description: "Cost fields (`costPrice`, movement `unitCost`) only with `products.view_cost`."
+      x-permission: products.read
+      responses:
+        '200':
+          description: Product detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/ProductDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Products]
+      summary: Update a product
+      description: "Stock cannot be edited (BR-INV-01; unknown fields → 422). Changing `costPrice` requires `products.view_cost`. Archived products must be unarchived before `status` changes (409 INVALID_STATE_TRANSITION)."
+      x-permission: products.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ProductUpdate' }
+      responses:
+        '200':
+          description: Updated product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Duplicate' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+    delete:
+      tags: [Products]
+      summary: Delete a product without history
+      description: Returns `409 REFERENCED` once the product has purchase lines, order lines or stock movements — archive it instead (BR-PROD-02).
+      x-permission: products.manage
+      responses:
+        '204': { description: Deleted (images removed) }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Referenced' }
+
+  /products/{id}/archive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Products]
+      summary: Archive a product
+      description: Idempotent. Archived products stay in history but cannot be used on new documents.
+      x-permission: products.manage
+      responses:
+        '200':
+          description: Product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /products/{id}/unarchive:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Products]
+      summary: Unarchive a product (sets ACTIVE)
+      description: Idempotent.
+      x-permission: products.manage
+      responses:
+        '200':
+          description: Product
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/Product' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /suppliers:
     get:
       tags: [Suppliers]
@@ -1217,6 +1385,107 @@ components:
         productCount: { type: integer, example: 12 }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
+
+    ProductInput:
+      type: object
+      required: [sku, name, sellingPrice]
+      properties:
+        sku: { type: string, maxLength: 64, description: 'Trimmed and upper-cased; unique' }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        sellingPrice: { type: string, pattern: '^\d{1,12}(\.\d{1,2})?$' }
+        barcode: { type: string, maxLength: 64, nullable: true }
+        description: { type: string, maxLength: 5000, nullable: true }
+        categoryId: { type: string, format: uuid, nullable: true }
+        unit: { type: string, maxLength: 20, default: pcs }
+        costPrice: { type: string, pattern: '^\d{1,10}(\.\d{1,4})?$', description: 'Requires products.view_cost' }
+        taxRate: { type: string, nullable: true, description: '0–100; null = business default rate' }
+        reorderLevel: { type: integer, minimum: 0, nullable: true, description: 'null = business default threshold' }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+        openingStock: { type: integer, minimum: 0 }
+
+    ProductUpdate:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        sku: { type: string, maxLength: 64 }
+        name: { type: string, minLength: 1, maxLength: 200 }
+        sellingPrice: { type: string, pattern: '^\d{1,12}(\.\d{1,2})?$' }
+        barcode: { type: string, maxLength: 64, nullable: true }
+        description: { type: string, maxLength: 5000, nullable: true }
+        categoryId: { type: string, format: uuid, nullable: true }
+        unit: { type: string, maxLength: 20, default: pcs }
+        costPrice: { type: string, pattern: '^\d{1,10}(\.\d{1,4})?$', description: 'Requires products.view_cost' }
+        taxRate: { type: string, nullable: true, description: '0–100; null = business default rate' }
+        reorderLevel: { type: integer, minimum: 0, nullable: true, description: 'null = business default threshold' }
+        status: { type: string, enum: [ACTIVE, INACTIVE] }
+
+    Product:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string, example: TEA-01 }
+        barcode: { type: string, nullable: true }
+        name: { type: string }
+        description: { type: string, nullable: true }
+        unit: { type: string, example: pcs }
+        costPrice: { type: string, example: '80.5' }
+        sellingPrice: { type: string, example: '120' }
+        taxRate: { type: string, nullable: true }
+        stockQuantity: { type: integer }
+        reorderLevel: { type: integer, nullable: true }
+        lowStockThreshold: { type: integer, description: 'reorderLevel or the business default' }
+        stockState: { type: string, enum: [IN_STOCK, LOW, OUT] }
+        status: { type: string, enum: [ACTIVE, INACTIVE, ARCHIVED] }
+        category:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            status: { type: string, enum: [ACTIVE, ARCHIVED] }
+        primaryImageId: { type: string, format: uuid, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    ProductImage:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        originalName: { type: string }
+        mimeType: { type: string, enum: [image/jpeg, image/png, image/webp] }
+        sizeBytes: { type: integer }
+        sortOrder: { type: integer, description: '0 = primary' }
+        createdAt: { type: string, format: date-time }
+
+    ProductDetail:
+      allOf:
+        - $ref: '#/components/schemas/Product'
+        - type: object
+          properties:
+            images:
+              type: array
+              items: { $ref: '#/components/schemas/ProductImage' }
+            recentMovements:
+              type: array
+              description: Latest 10 movements
+              items:
+                type: object
+                properties:
+                  id: { type: string, format: uuid }
+                  type: { type: string, enum: [OPENING_STOCK, PURCHASE_RECEIPT, SALE, SALE_CANCELLATION, SALE_RETURN, ADJUSTMENT_IN, ADJUSTMENT_OUT] }
+                  quantityChange: { type: integer }
+                  previousStock: { type: integer }
+                  resultingStock: { type: integer }
+                  unitCost: { type: string, description: 'Only with products.view_cost' }
+                  adjustmentReason: { type: string, nullable: true }
+                  notes: { type: string, nullable: true }
+                  createdAt: { type: string, format: date-time }
+                  performedBy:
+                    type: object
+                    properties:
+                      id: { type: string, format: uuid }
+                      name: { type: string }
 
     SupplierInput:
       type: object

@@ -11,6 +11,7 @@ const testEnv = {
   BCRYPT_ROUNDS: '4',
   RATE_LIMIT_ENABLED: 'false',
   LOG_LEVEL: 'silent',
+  UPLOAD_DIR: 'uploads-test',
   APP_URL: 'http://localhost:3000',
   CORS_ORIGINS: 'http://localhost:3000',
 };

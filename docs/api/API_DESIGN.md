@@ -127,6 +127,13 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | DELETE | `/categories/:id` | ✔ | `categories.manage` | Only when no product references it (409 `REFERENCED`) |
 | POST | `/categories/:id/archive` | ✔ | `categories.manage` | Idempotent |
 | POST | `/categories/:id/unarchive` | ✔ | `categories.manage` | Idempotent |
+| GET | `/products` | ✔ | `products.read` | Search name/SKU/barcode; filters `status`, `stockState` (IN_STOCK/LOW/OUT), `categoryId`; sort `name`, `sku`, `sellingPrice`, `stockQuantity`, `createdAt`. `costPrice` only with `products.view_cost` |
+| POST | `/products` | ✔ | `products.manage` | SKU upper-cased, unique; optional `openingStock` → OPENING_STOCK movement; `costPrice` needs `products.view_cost`; category must be active |
+| GET | `/products/:id` | ✔ | `products.read` | With `images`, `recentMovements` (10; `unitCost` only with `products.view_cost`) |
+| PATCH | `/products/:id` | ✔ | `products.manage` | No stock field (BR-INV-01); `costPrice` needs `products.view_cost`; audited diff |
+| DELETE | `/products/:id` | ✔ | `products.manage` | Only without purchase/order lines or movements (409 `REFERENCED`); removes image files |
+| POST | `/products/:id/archive` | ✔ | `products.manage` | Idempotent |
+| POST | `/products/:id/unarchive` | ✔ | `products.manage` | Idempotent; sets ACTIVE |
 | GET | `/suppliers` | ✔ | `suppliers.read` | Search name/contact/phone/email; filter `status`; sort `name`, `createdAt` |
 | POST | `/suppliers` | ✔ | `suppliers.manage` | Email lower-cased; empty optional fields stored as null |
 | GET | `/suppliers/:id` | ✔ | `suppliers.read` | With `summary`: purchaseCount, totalPurchased, totalPaid, outstandingBalance (active purchases, BR-PAY-08) |

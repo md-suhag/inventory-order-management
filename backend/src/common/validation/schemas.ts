@@ -29,3 +29,20 @@ export const optionalText = (max: number) =>
     .transform((v) => (v === '' ? null : v))
     .nullable()
     .optional();
+
+/**
+ * Non-negative decimal sent as a string (preferred) or number; output is a plain decimal string
+ * for Prisma.Decimal. Limits mirror the column's numeric(precision, scale).
+ */
+export const decimalString = (intDigits: number, scale: number) =>
+  z
+    .union([z.string().trim(), z.number()])
+    .transform((v) => String(v))
+    .pipe(
+      z
+        .string()
+        .regex(
+          new RegExp(`^\\d{1,${intDigits}}(\\.\\d{1,${scale}})?$`),
+          `Must be a non-negative number with at most ${intDigits} digits and ${scale} decimals`,
+        ),
+    );
