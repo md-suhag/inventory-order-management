@@ -11,7 +11,7 @@ _Last updated: 2026-11-09_
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
 | 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
-| 5 · Orders & payments | 🟡 In progress | Orders, invoices, payments, refunds, balances |
+| 5 · Orders & payments | ✅ Ready for review | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ⏳ | |
 | 7 · Frontend | ⏳ | |
 | 8 · Testing & hardening | ⏳ | |
@@ -77,6 +77,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 | Branch | Content |
 |--------|---------|
 | `main` | Phase 0–4 complete |
+| `phase-5/orders-payments` | Phase 5: Orders & payments complete (ready for merge) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -92,7 +93,7 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 | Suite | Tests | Result |
 |-------|-------|--------|
 | Unit | 58 | ✅ |
-| Integration (PostgreSQL 16) | 116 | ✅ (2026-11-09) |
+| Integration (PostgreSQL 16) | 135 | ✅ (Phase 1–5: 193 total across unit + integration) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
 | E2E | – | Phase 8 |
 
