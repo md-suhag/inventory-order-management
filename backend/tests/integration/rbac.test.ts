@@ -76,7 +76,9 @@ describe('seeded roles', () => {
   it('match the documented permission matrix', async () => {
     const grants = async (name: string) =>
       (await prisma.rolePermission.findMany({ where: { role: { name } } })).map((g) => g.permissionKey);
-    const [admin, manager, staff] = await Promise.all([grants('ADMIN'), grants('MANAGER'), grants('STAFF')]);
+    const admin = await grants('ADMIN');
+    const manager = await grants('MANAGER');
+    const staff = await grants('STAFF');
     const total = await prisma.permission.count();
     expect(admin).toHaveLength(total);
     expect(manager).not.toContain('users.manage');

@@ -48,7 +48,7 @@ export interface ProductView extends Omit<ProductRow, 'costPrice' | 'images'> {
   primaryImageId: string | null;
 }
 
-async function defaultLowStockThreshold(db: Db = prisma): Promise<number> {
+export async function defaultLowStockThreshold(db: Db = prisma): Promise<number> {
   const settings = await db.businessSetting.findUnique({ where: { id: 1 }, select: { defaultLowStockThreshold: true } });
   return settings?.defaultLowStockThreshold ?? 10;
 }
@@ -70,7 +70,7 @@ function present({ costPrice, images, ...row }: ProductRow, viewer: Viewer, defa
 }
 
 /** Prisma filter for BR-PROD-04 stock states (column-to-column comparison via field references). */
-function stockStateWhere(state: StockState, defaultThreshold: number): Prisma.ProductWhereInput {
+export function stockStateWhere(state: StockState, defaultThreshold: number): Prisma.ProductWhereInput {
   const reorder = prisma.product.fields.reorderLevel;
   switch (state) {
     case 'OUT':

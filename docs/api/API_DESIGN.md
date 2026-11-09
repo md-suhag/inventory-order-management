@@ -153,5 +153,19 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | DELETE | `/customers/:id` | ✔ | `customers.archive` | Only while no order references it (409 `REFERENCED`) |
 | POST | `/customers/:id/archive` | ✔ | `customers.archive` | Idempotent; archived customers cannot be used on new orders |
 | POST | `/customers/:id/unarchive` | ✔ | `customers.archive` | Idempotent |
+| GET | `/purchases` | ✔ | `purchases.read` | Filter by `supplierId`, `status`, `paymentStatus`, date range; search by number / supplier reference; sort `purchaseNumber`, `createdAt`, `orderedAt`, `totalAmount` |
+| POST | `/purchases` | ✔ | `purchases.manage` | Create DRAFT purchase; server calculates line and document totals, allocating header discount by largest remainder (BR-CALC-05); validates active supplier and products |
+| GET | `/purchases/:id` | ✔ | `purchases.read` | Purchase detail with lines (ordered, received, remaining), receipts and balance due |
+| PATCH | `/purchases/:id` | ✔ | `purchases.manage` | Update draft purchase fields and lines; 409 if not in DRAFT |
+| DELETE | `/purchases/:id` | ✔ | `purchases.manage` | Delete draft purchase; 409 if not in DRAFT |
+| POST | `/purchases/:id/confirm` | ✔ | `purchases.confirm` | Transitions DRAFT → ORDERED; locks line prices, stock remains unchanged (BR-PUR-01) |
+| POST | `/purchases/:id/cancel` | ✔ | `purchases.cancel` | Allowed from DRAFT or ORDERED with 0 receipts; 409 if receipts exist |
+| POST | `/purchases/:id/receipts` | ✔ | `purchases.receive` | Record goods receipt; increases stock with PURCHASE_RECEIPT movements, blends WAC (BR-INV-05); requires `Idempotency-Key` (BR-PUR-07) |
+| GET | `/purchases/:id/receipts` | ✔ | `purchases.read` | List goods receipts for purchase |
+| GET | `/inventory` | ✔ | `inventory.read` | Product inventory overview with stockState (IN_STOCK, LOW, OUT); `costPrice` and `stockValue` only with `products.view_cost` |
+| GET | `/inventory/low-stock` | ✔ | `inventory.read` | Quick filter for products at or below reorder level |
+| POST | `/inventory/adjustments` | ✔ | `inventory.adjust` | Single-product stock adjustment (IN/OUT); reason required, non-empty notes mandatory for OTHER; requires `Idempotency-Key` |
+| GET | `/inventory/movements` | ✔ | `inventory.read` | Movement history; filter by product, type, dates, performedBy; unitCost gated by `products.view_cost` |
+| GET | `/inventory/movements/:id` | ✔ | `inventory.read` | Movement detail; unitCost gated by `products.view_cost` |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.

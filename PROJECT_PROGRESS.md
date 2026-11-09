@@ -9,8 +9,8 @@ _Last updated: 2026-11-09_
 | 0 · Inspection & requirements | ✅ Approved 2026-11-08 | Requirements, NFRs, business rules |
 | 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports); review decisions applied |
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
-| 3 · Core business modules | 🟡 Complete 2026-11-09 — awaiting owner review (`phase-3/core-modules`) | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
-| 4 · Purchase & inventory | ⏳ | |
+| 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
+| 4 · Purchase & inventory | 🟡 Complete — pending owner review (`phase-4/purchase-inventory`) | Purchases, goods receipts, inventory management & adjustments, movements |
 | 5 · Orders & payments | ⏳ | |
 | 6 · Returns, reports, audit, settings | ⏳ | |
 | 7 · Frontend | ⏳ | |
@@ -29,8 +29,8 @@ _Last updated: 2026-11-09_
 | Categories | ✅ | ✅ CRUD, archive/unarchive, delete only when unused | – | ✅ |
 | Suppliers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
 | Customers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
-| Purchases & receiving | ✅ | – | – | – |
-| Inventory | ✅ | 🟡 service (movement + WAC) used by opening stock; API in Phase 4 | – | 🟡 |
+| Purchases & receiving | ✅ | ✅ CRUD, confirm (`DRAFT` → `ORDERED`), cancel, atomic goods receipt with WAC blending, idempotency replay, receipt listing | – | ✅ |
+| Inventory | ✅ | ✅ overview with stock state & cost privacy gating, low-stock query, manual adjustments (`ADJUSTMENT_IN`/`OUT`), movement history & details | – | ✅ |
 | Orders & invoices | ✅ | – | – | – |
 | Payments | ✅ | – | – | – |
 | Sales returns | ✅ | – | – | – |
@@ -42,11 +42,13 @@ _Last updated: 2026-11-09_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. ~~Create branch `phase-3/core-modules`.~~ Done 2026-11-09.
-2. ~~Users & roles~~ Done 2026-11-09 (BR-USER-06/07 added: anti-escalation rules).
-3. ~~Categories, products (+ images), suppliers, customers~~ Done 2026-11-09.
-4. ~~Dashboard foundation~~ Done 2026-11-09 (net sales / gross profit / purchase value tiles come with Phases 5–6).
-5. **Owner review of Phase 3**, then ff-merge `phase-3/core-modules` → `main` and start Phase 4 (purchases, goods receipts, inventory adjustments + movement history API).
+1. Owner review checkpoint for Phase 4 (`phase-4/purchase-inventory`).
+2. Merge `phase-4/purchase-inventory` into `main`.
+3. Create branch `phase-5/orders-payments` for Phase 5 (Orders & payments).
+4. Implement Orders module: draft CRUD, line snapshotting, order confirmation (stock deduction with row lock), cancellation (stock restoration), invoice generation.
+5. Implement Payments module: payments against orders, refunds, payment reversal, idempotency replay, balance updates.
+6. Integration tests, OpenAPI & API_DESIGN update, check lint + typecheck + tests.
+7. Owner review of Phase 5, merge to `main`.
 
 ## Phase 2 deliverables
 
@@ -74,8 +76,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–2 + npm 10 lockfile fix (PR #1) — pushed to `origin` (GitHub) |
-| `phase-3/core-modules` | Phase 3 complete, awaiting review |
+| `main` | Phase 0–3 complete |
+| `phase-4/purchase-inventory` | Phase 4 (Purchases, Receiving, Inventory & Adjustments) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -90,8 +92,8 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 
 | Suite | Tests | Result |
 |-------|-------|--------|
-| Unit | 53 | ✅ |
-| Integration (PostgreSQL 16) | 100 | ✅ (2026-11-09) |
+| Unit | 58 | ✅ |
+| Integration (PostgreSQL 16) | 116 | ✅ (2026-11-09) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
 | E2E | – | Phase 8 |
 

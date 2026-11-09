@@ -1411,6 +1411,395 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /purchases:
+    get:
+      tags: [Purchases]
+      summary: List purchases
+      description: Paginated purchases with filters.
+      x-permission: purchases.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: supplierId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [DRAFT, ORDERED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED] }
+        - name: paymentStatus
+          in: query
+          schema: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED] }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, example: 'createdAt:desc' }
+      responses:
+        '200':
+          description: Paginated purchase list
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/PurchaseListItem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Purchases]
+      summary: Create a purchase draft
+      description: Creates a new purchase order in DRAFT status with server-calculated totals.
+      x-permission: purchases.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreatePurchaseBody' }
+      responses:
+        '201':
+          description: Purchase created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /purchases/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Purchases]
+      summary: Get purchase detail
+      x-permission: purchases.read
+      responses:
+        '200':
+          description: Purchase detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    patch:
+      tags: [Purchases]
+      summary: Update draft purchase
+      description: Allowed only while in DRAFT status. Recalculates all line totals.
+      x-permission: purchases.manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePurchaseBody' }
+      responses:
+        '200':
+          description: Updated purchase
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+    delete:
+      tags: [Purchases]
+      summary: Delete draft purchase
+      description: Allowed only while in DRAFT status.
+      x-permission: purchases.manage
+      responses:
+        '204':
+          description: Deleted
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /purchases/{id}/confirm:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Purchases]
+      summary: Confirm purchase order
+      description: Transitions purchase from DRAFT to ORDERED. Lines become read-only.
+      x-permission: purchases.confirm
+      responses:
+        '200':
+          description: Confirmed purchase
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /purchases/{id}/cancel:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Purchases]
+      summary: Cancel purchase
+      description: Cancels a DRAFT or ORDERED purchase without receipts.
+      x-permission: purchases.cancel
+      responses:
+        '200':
+          description: Cancelled purchase
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /purchases/{id}/receipts:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Purchases]
+      summary: List goods receipts for purchase
+      x-permission: purchases.read
+      responses:
+        '200':
+          description: Receipts list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/PurchaseReceipt' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+    post:
+      tags: [Purchases]
+      summary: Receive goods for purchase
+      description: Records goods receipt (GRN), creates inventory movements, updates weighted-average cost.
+      x-permission: purchases.receive
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceiveGoodsBody' }
+      responses:
+        '201':
+          description: Receipt recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseReceipt' }
+        '200':
+          description: Idempotent replay of previous receipt
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PurchaseReceipt' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /inventory:
+    get:
+      tags: [Inventory]
+      summary: Inventory stock overview
+      description: Stock overview with states. Cost price and stock valuation require products.view_cost.
+      x-permission: inventory.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [ACTIVE, INACTIVE, ARCHIVED] }
+        - name: stockState
+          in: query
+          schema: { type: string, enum: [IN_STOCK, LOW, OUT] }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: sort
+          in: query
+          schema: { type: string, example: 'name:asc' }
+      responses:
+        '200':
+          description: Inventory overview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/InventoryProductItem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /inventory/low-stock:
+    get:
+      tags: [Inventory]
+      summary: Low stock products
+      description: Active products where stock quantity is below or equal to reorder level.
+      x-permission: inventory.read
+      responses:
+        '200':
+          description: Low stock list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/InventoryProductItem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /inventory/adjustments:
+    post:
+      tags: [Inventory]
+      summary: Manual stock adjustment
+      description: Single product stock adjustment. Requires Idempotency-Key.
+      x-permission: inventory.adjust
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateAdjustmentBody' }
+      responses:
+        '201':
+          description: Adjustment recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/InventoryMovement' }
+        '200':
+          description: Idempotent replay of previous adjustment
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/InventoryMovement' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /inventory/movements:
+    get:
+      tags: [Inventory]
+      summary: Inventory movement ledger
+      description: Append-only movement history. Unit cost visible with products.view_cost.
+      x-permission: inventory.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: productId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: type
+          in: query
+          schema: { type: string, enum: [OPENING_STOCK, PURCHASE_RECEIPT, SALE, SALE_CANCELLATION, SALE_RETURN, ADJUSTMENT_IN, ADJUSTMENT_OUT] }
+        - name: performedById
+          in: query
+          schema: { type: string, format: uuid }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: sort
+          in: query
+          schema: { type: string, example: 'createdAt:desc' }
+      responses:
+        '200':
+          description: Movement ledger
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PageMeta'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items: { $ref: '#/components/schemas/InventoryMovement' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /inventory/movements/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Inventory]
+      summary: Movement detail
+      x-permission: inventory.read
+      responses:
+        '200':
+          description: Movement detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/InventoryMovement' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1432,8 +1821,224 @@ components:
       name: pageSize
       in: query
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, minLength: 8, maxLength: 100 }
+      description: Unique client key for idempotent operations (BR-IDEM-01).
 
   schemas:
+    PurchaseListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        purchaseNumber: { type: string, example: PO-000001 }
+        supplierId: { type: string, format: uuid }
+        supplierName: { type: string }
+        status: { type: string, enum: [DRAFT, ORDERED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED] }
+        paymentStatus: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED] }
+        supplierReference: { type: string, nullable: true }
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+        totalAmount: { type: string, example: '250.00' }
+        paidAmount: { type: string, example: '0.00' }
+        balanceDue: { type: string, example: '250.00' }
+        itemCount: { type: integer }
+        orderedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    PurchaseItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        lineNo: { type: integer }
+        productName: { type: string }
+        productSku: { type: string }
+        quantity: { type: integer }
+        receivedQuantity: { type: integer }
+        remainingQuantity: { type: integer }
+        unitCost: { type: string, example: '10.00' }
+        discountAmount: { type: string, example: '0.00' }
+        allocatedDiscount: { type: string, example: '0.00' }
+        taxRate: { type: string, example: '0.0000' }
+        taxAmount: { type: string, example: '0.00' }
+        lineTotal: { type: string, example: '10.00' }
+
+    PurchaseReceiptItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        purchaseItemId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        productSku: { type: string }
+        quantity: { type: integer }
+        unitCost: { type: string, example: '10.0000' }
+
+    PurchaseReceipt:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        receiptNumber: { type: string, example: GRN-000001 }
+        receivedAt: { type: string, format: date-time }
+        notes: { type: string, nullable: true }
+        idempotencyKey: { type: string, nullable: true }
+        receivedBy: { $ref: '#/components/schemas/User' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseReceiptItem' }
+
+    PurchaseDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        purchaseNumber: { type: string, example: PO-000001 }
+        supplierId: { type: string, format: uuid }
+        status: { type: string, enum: [DRAFT, ORDERED, PARTIALLY_RECEIVED, RECEIVED, CANCELLED] }
+        paymentStatus: { type: string, enum: [UNPAID, PARTIALLY_PAID, PAID, PARTIALLY_REFUNDED, REFUNDED] }
+        supplierReference: { type: string, nullable: true }
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+        subtotal: { type: string, example: '100.00' }
+        discountType: { type: string, enum: [FIXED, PERCENTAGE], nullable: true }
+        discountValue: { type: string, nullable: true }
+        discountAmount: { type: string, example: '0.00' }
+        taxAmount: { type: string, example: '0.00' }
+        totalAmount: { type: string, example: '100.00' }
+        paidAmount: { type: string, example: '0.00' }
+        refundedAmount: { type: string, example: '0.00' }
+        balanceDue: { type: string, example: '100.00' }
+        notes: { type: string, nullable: true }
+        orderedAt: { type: string, format: date-time, nullable: true }
+        receivedAt: { type: string, format: date-time, nullable: true }
+        cancelledAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        supplier:
+          type: object
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+            contactPerson: { type: string, nullable: true }
+            phone: { type: string, nullable: true }
+            email: { type: string, nullable: true }
+            status: { type: string }
+        createdBy: { $ref: '#/components/schemas/User' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseItem' }
+        receipts:
+          type: array
+          items: { $ref: '#/components/schemas/PurchaseReceipt' }
+
+    CreatePurchaseBody:
+      type: object
+      required: [supplierId, items]
+      properties:
+        supplierId: { type: string, format: uuid }
+        supplierReference: { type: string, nullable: true }
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+        notes: { type: string, nullable: true }
+        discountType: { type: string, enum: [FIXED, PERCENTAGE], nullable: true }
+        discountValue: { type: string, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity, unitCost]
+            properties:
+              productId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+              unitCost: { type: string, example: '10.00' }
+              discountAmount: { type: string, nullable: true }
+              taxRate: { type: string, nullable: true }
+
+    UpdatePurchaseBody:
+      type: object
+      properties:
+        supplierId: { type: string, format: uuid }
+        supplierReference: { type: string, nullable: true }
+        expectedDeliveryDate: { type: string, format: date, nullable: true }
+        notes: { type: string, nullable: true }
+        discountType: { type: string, enum: [FIXED, PERCENTAGE], nullable: true }
+        discountValue: { type: string, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [productId, quantity, unitCost]
+            properties:
+              productId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+              unitCost: { type: string, example: '10.00' }
+              discountAmount: { type: string, nullable: true }
+              taxRate: { type: string, nullable: true }
+
+    ReceiveGoodsBody:
+      type: object
+      required: [items]
+      properties:
+        notes: { type: string, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [purchaseItemId, quantity]
+            properties:
+              purchaseItemId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+
+    InventoryProductItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        sku: { type: string }
+        name: { type: string }
+        unit: { type: string }
+        status: { type: string }
+        category:
+          type: object
+          nullable: true
+          properties:
+            id: { type: string, format: uuid }
+            name: { type: string }
+        stockQuantity: { type: integer }
+        reorderLevel: { type: integer, nullable: true }
+        lowStockThreshold: { type: integer }
+        stockState: { type: string, enum: [IN_STOCK, LOW, OUT] }
+        costPrice: { type: string, description: Requires products.view_cost }
+        stockValue: { type: string, description: Requires products.view_cost }
+
+    CreateAdjustmentBody:
+      type: object
+      required: [productId, direction, quantity, reason]
+      properties:
+        productId: { type: string, format: uuid }
+        direction: { type: string, enum: [IN, OUT] }
+        quantity: { type: integer, minimum: 1 }
+        reason: { type: string, enum: [COUNT_CORRECTION, DAMAGED, EXPIRED, LOST, STOLEN, FOUND, OTHER] }
+        notes: { type: string, description: Mandatory when reason is OTHER, nullable: true }
+
+    InventoryMovement:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        productSku: { type: string }
+        type: { type: string, enum: [OPENING_STOCK, PURCHASE_RECEIPT, SALE, SALE_CANCELLATION, SALE_RETURN, ADJUSTMENT_IN, ADJUSTMENT_OUT] }
+        quantityChange: { type: integer }
+        previousStock: { type: integer }
+        resultingStock: { type: integer }
+        unitCost: { type: string, description: Requires products.view_cost }
+        referenceNumber: { type: string, nullable: true }
+        adjustmentReason: { type: string, nullable: true }
+        notes: { type: string, nullable: true }
+        performedBy: { $ref: '#/components/schemas/User' }
+        createdAt: { type: string, format: date-time }
     Password:
       type: string
       minLength: 8
