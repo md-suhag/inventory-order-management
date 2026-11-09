@@ -1,7 +1,13 @@
 import type { Router } from 'express';
 import { authRouter } from './modules/auth/auth.routes';
+import { customersRouter } from './modules/customers/customers.routes';
+import { categoriesRouter } from './modules/categories/categories.routes';
+import { dashboardRouter } from './modules/dashboard/dashboard.routes';
 import { healthRouter } from './modules/health/health.routes';
+import { productsRouter } from './modules/products/products.routes';
 import { rolesRouter } from './modules/roles/roles.routes';
+import { suppliersRouter } from './modules/suppliers/suppliers.routes';
+import { usersRouter } from './modules/users/users.routes';
 
 export const API_PREFIX = '/api/v1';
 
@@ -9,7 +15,13 @@ export const API_PREFIX = '/api/v1';
 export const apiModules: { path: string; router: Router }[] = [
   { path: '/health', router: healthRouter },
   { path: '/auth', router: authRouter },
+  { path: '/users', router: usersRouter },
   { path: '/roles', router: rolesRouter },
+  { path: '/dashboard', router: dashboardRouter },
+  { path: '/categories', router: categoriesRouter },
+  { path: '/products', router: productsRouter },
+  { path: '/suppliers', router: suppliersRouter },
+  { path: '/customers', router: customersRouter },
 ];
 
 interface RouteLayer {

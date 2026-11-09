@@ -50,7 +50,7 @@ Machine-readable contract: [`openapi.yaml`](openapi.yaml) (served at `/api/docs`
 | 404 | `NOT_FOUND` | Unknown route or resource |
 | 409 | `CONFLICT`, `DUPLICATE`, `REFERENCED`, `INVALID_STATE_TRANSITION`, `TRANSACTION_CONFLICT` | Unique conflicts, referenced records, wrong document status, lock conflicts |
 | 413 | `PAYLOAD_TOO_LARGE` | Body > 100 kB |
-| 422 | `VALIDATION_ERROR`, `BUSINESS_RULE_VIOLATION`, `IDEMPOTENCY_KEY_REUSED` | Field validation (all invalid fields listed); business rule failures (e.g. insufficient stock, overpayment) |
+| 422 | `VALIDATION_ERROR`, `INVALID_REFERENCE`, `BUSINESS_RULE_VIOLATION`, `IDEMPOTENCY_KEY_REUSED` | Field validation (all invalid fields listed); a referenced id in the body does not exist (e.g. `roleId`); business rule failures (e.g. insufficient stock, overpayment, last active admin) |
 | 429 | `RATE_LIMITED` | Rate limit exceeded |
 | 500 | `INTERNAL_ERROR` | Unexpected; details never exposed in production |
 
@@ -108,6 +108,50 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | GET | `/auth/me` | ✔ | – | Profile + effective permissions |
 | PATCH | `/auth/me` | ✔ | – | Name, phone |
 | POST | `/auth/change-password` | ✔ | – | Returns a fresh token pair |
+| GET | `/users` | ✔ | `users.read` | Search name/email; filters `roleId`, `isActive`; sort `name`, `email`, `createdAt`, `lastLoginAt` |
+| POST | `/users` | ✔ | `users.manage` | Active user with initial password; ADMIN role only assignable by an admin |
+| GET | `/users/:id` | ✔ | `users.read` | |
+| PATCH | `/users/:id` | ✔ | `users.manage` | Name, phone, role; role change revokes sessions; not own role; last active admin protected |
+| POST | `/users/:id/activate` | ✔ | `users.manage` | Idempotent; clears lockout |
+| POST | `/users/:id/deactivate` | ✔ | `users.manage` | Idempotent; revokes sessions; not self; last active admin protected |
 | GET | `/roles/permissions` | ✔ | `roles.read` | Permission catalogue |
+| GET | `/roles` | ✔ | `roles.read` | With permissions + `userCount`; search name/description; sort `name`, `createdAt` |
+| POST | `/roles` | ✔ | `roles.manage` | Custom role; names unique case-insensitively; non-admins only grant what they hold |
+| GET | `/roles/:id` | ✔ | `roles.read` | |
+| PATCH | `/roles/:id` | ✔ | `roles.manage` | `permissions` replaces the set; ADMIN immutable; system roles not renamable; non-admins not on own role |
+| DELETE | `/roles/:id` | ✔ | `roles.manage` | Custom roles only; 409 `REFERENCED` while users hold it |
+| GET | `/dashboard/summary` | ✔ | `dashboard.read` | `from`/`to` dates in business timezone (default current month); counts, orders by status, low/out of stock; `recentOrders` (`orders.read`), `recentPurchases` (`purchases.read`), `financials` (`dashboard.financials`) |
+| GET | `/categories` | ✔ | `categories.read` | With `productCount`; search name/description; filter `status`; sort `name`, `createdAt`, `productCount` |
+| POST | `/categories` | ✔ | `categories.manage` | Names unique case-insensitively |
+| GET | `/categories/:id` | ✔ | `categories.read` | |
+| PATCH | `/categories/:id` | ✔ | `categories.manage` | Name, description |
+| DELETE | `/categories/:id` | ✔ | `categories.manage` | Only when no product references it (409 `REFERENCED`) |
+| POST | `/categories/:id/archive` | ✔ | `categories.manage` | Idempotent |
+| POST | `/categories/:id/unarchive` | ✔ | `categories.manage` | Idempotent |
+| GET | `/products` | ✔ | `products.read` | Search name/SKU/barcode; filters `status`, `stockState` (IN_STOCK/LOW/OUT), `categoryId`; sort `name`, `sku`, `sellingPrice`, `stockQuantity`, `createdAt`. `costPrice` only with `products.view_cost` |
+| POST | `/products` | ✔ | `products.manage` | SKU upper-cased, unique; optional `openingStock` → OPENING_STOCK movement; `costPrice` needs `products.view_cost`; category must be active |
+| GET | `/products/:id` | ✔ | `products.read` | With `images`, `recentMovements` (10; `unitCost` only with `products.view_cost`) |
+| PATCH | `/products/:id` | ✔ | `products.manage` | No stock field (BR-INV-01); `costPrice` needs `products.view_cost`; audited diff |
+| DELETE | `/products/:id` | ✔ | `products.manage` | Only without purchase/order lines or movements (409 `REFERENCED`); removes image files |
+| POST | `/products/:id/archive` | ✔ | `products.manage` | Idempotent |
+| POST | `/products/:id/unarchive` | ✔ | `products.manage` | Idempotent; sets ACTIVE |
+| POST | `/products/:id/images` | ✔ | `products.manage` | Multipart `images` (1–5 files); JPEG/PNG/WebP by magic bytes, ≤ 2 MB each (413), ≤ 5 per product (422) |
+| PUT | `/products/:id/images/order` | ✔ | `products.manage` | `imageIds` lists every image once; first = primary |
+| GET | `/products/:id/images/:imageId` | ✔ | `products.read` | Image bytes with stored content type, `nosniff` |
+| DELETE | `/products/:id/images/:imageId` | ✔ | `products.manage` | Renumbers the rest; removes the file |
+| GET | `/suppliers` | ✔ | `suppliers.read` | Search name/contact/phone/email; filter `status`; sort `name`, `createdAt` |
+| POST | `/suppliers` | ✔ | `suppliers.manage` | Email lower-cased; empty optional fields stored as null |
+| GET | `/suppliers/:id` | ✔ | `suppliers.read` | With `summary`: purchaseCount, totalPurchased, totalPaid, outstandingBalance (active purchases, BR-PAY-08) |
+| PATCH | `/suppliers/:id` | ✔ | `suppliers.manage` | Any subset of fields; ""/null clears optional fields |
+| DELETE | `/suppliers/:id` | ✔ | `suppliers.manage` | Only while no purchase references it (409 `REFERENCED`) |
+| POST | `/suppliers/:id/archive` | ✔ | `suppliers.manage` | Idempotent; archived suppliers cannot receive new purchases |
+| POST | `/suppliers/:id/unarchive` | ✔ | `suppliers.manage` | Idempotent |
+| GET | `/customers` | ✔ | `customers.read` | Search name/phone/email; filter `status`; sort `name`, `createdAt` |
+| POST | `/customers` | ✔ | `customers.manage` |  |
+| GET | `/customers/:id` | ✔ | `customers.read` | With `summary`: orderCount, totalSales (net of returns), totalPaid, outstandingBalance (confirmed/completed orders) |
+| PATCH | `/customers/:id` | ✔ | `customers.manage` | Any subset of fields; ""/null clears optional fields |
+| DELETE | `/customers/:id` | ✔ | `customers.archive` | Only while no order references it (409 `REFERENCED`) |
+| POST | `/customers/:id/archive` | ✔ | `customers.archive` | Idempotent; archived customers cannot be used on new orders |
+| POST | `/customers/:id/unarchive` | ✔ | `customers.archive` | Idempotent |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.

@@ -13,6 +13,13 @@ export const nameSchema = (max = 100) => z.string().trim().min(1, 'Required').ma
 export const uuidSchema = z.uuid('Invalid id');
 export const idParamsSchema = z.object({ id: uuidSchema });
 
+/** Optional contact fields: "" or null clears the value on update. */
+export const optionalPhone = z.union([z.literal('').transform(() => null), phoneSchema]).nullable().optional();
+export const optionalEmail = z
+  .union([z.literal('').transform(() => null), emailSchema])
+  .nullable()
+  .optional();
+
 /** Optional free text: trims, converts "" to null (clears the field on update). */
 export const optionalText = (max: number) =>
   z
@@ -22,3 +29,20 @@ export const optionalText = (max: number) =>
     .transform((v) => (v === '' ? null : v))
     .nullable()
     .optional();
+
+/**
+ * Non-negative decimal sent as a string (preferred) or number; output is a plain decimal string
+ * for Prisma.Decimal. Limits mirror the column's numeric(precision, scale).
+ */
+export const decimalString = (intDigits: number, scale: number) =>
+  z
+    .union([z.string().trim(), z.number()])
+    .transform((v) => String(v))
+    .pipe(
+      z
+        .string()
+        .regex(
+          new RegExp(`^\\d{1,${intDigits}}(\\.\\d{1,${scale}})?$`),
+          `Must be a non-negative number with at most ${intDigits} digits and ${scale} decimals`,
+        ),
+    );

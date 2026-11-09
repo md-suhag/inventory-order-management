@@ -1,6 +1,6 @@
 # Project Progress
 
-_Last updated: 2026-11-08_
+_Last updated: 2026-11-09_
 
 ## Phase status
 
@@ -9,7 +9,7 @@ _Last updated: 2026-11-08_
 | 0 · Inspection & requirements | ✅ Approved 2026-11-08 | Requirements, NFRs, business rules |
 | 1 · Architecture & database design | ✅ Approved 2026-11-08 | Schema, constraints, migration, ERD (5 pages + exports); review decisions applied |
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
-| 3 · Core business modules | ⏳ Next | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
+| 3 · Core business modules | 🟡 Complete 2026-11-09 — awaiting owner review (`phase-3/core-modules`) | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ⏳ | |
 | 5 · Orders & payments | ⏳ | |
 | 6 · Returns, reports, audit, settings | ⏳ | |
@@ -23,14 +23,14 @@ _Last updated: 2026-11-08_
 | Module | DB design | Backend | Frontend | Tests |
 |--------|:-:|:-:|:-:|:-:|
 | Auth & accounts | ✅ | ✅ | – | ✅ |
-| Users & RBAC | ✅ | 🟡 RBAC middleware, permission catalogue, seeded roles; user/role CRUD in Phase 3 | – | 🟡 |
-| Dashboard | ✅ | – | – | – |
-| Products | ✅ | – | – | – |
-| Categories | ✅ | – | – | – |
-| Suppliers | ✅ | – | – | – |
-| Customers | ✅ | – | – | – |
+| Users & RBAC | ✅ | ✅ user admin API (last-admin guard, BR-USER-02..07), role CRUD + permission editing | – | ✅ |
+| Dashboard | ✅ | ✅ summary: counts, orders by status, low/out of stock, recent orders/purchases, inventory value + outstanding balances | – | ✅ |
+| Products | ✅ | ✅ CRUD, opening stock via inventory service, stock-state filters, cost visibility, images | – | ✅ |
+| Categories | ✅ | ✅ CRUD, archive/unarchive, delete only when unused | – | ✅ |
+| Suppliers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
+| Customers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
 | Purchases & receiving | ✅ | – | – | – |
-| Inventory | ✅ | – | – | – |
+| Inventory | ✅ | 🟡 service (movement + WAC) used by opening stock; API in Phase 4 | – | 🟡 |
 | Orders & invoices | ✅ | – | – | – |
 | Payments | ✅ | – | – | – |
 | Sales returns | ✅ | – | – | – |
@@ -42,11 +42,11 @@ _Last updated: 2026-11-08_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Create branch `phase-3/core-modules`.
-2. Users & roles: user CRUD/list (query builder), activate/deactivate, role assignment with **last-active-admin protection** (advisory lock, BR-USER-02), self-change restrictions (BR-USER-03), session revocation on deactivate/role change (BR-USER-04); role CRUD + permission editing (ADMIN immutable).
-3. Categories, products (+ images, opening stock via inventory movement, cost hidden without `products.view_cost`), suppliers, customers — each with list/search/sort/filter, archive rules, audit logs.
-4. Dashboard foundation (counts, low stock, recent activity — financial tiles once orders/purchases exist).
-5. For every module: tests, `openapi.yaml` + `API_DESIGN.md`, commit per task, update this file.
+1. ~~Create branch `phase-3/core-modules`.~~ Done 2026-11-09.
+2. ~~Users & roles~~ Done 2026-11-09 (BR-USER-06/07 added: anti-escalation rules).
+3. ~~Categories, products (+ images), suppliers, customers~~ Done 2026-11-09.
+4. ~~Dashboard foundation~~ Done 2026-11-09 (net sales / gross profit / purchase value tiles come with Phases 5–6).
+5. **Owner review of Phase 3**, then ff-merge `phase-3/core-modules` → `main` and start Phase 4 (purchases, goods receipts, inventory adjustments + movement history API).
 
 ## Phase 2 deliverables
 
@@ -74,7 +74,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–2 (merged) — not yet pushed to any remote |
+| `main` | Phase 0–2 + npm 10 lockfile fix (PR #1) — pushed to `origin` (GitHub) |
+| `phase-3/core-modules` | Phase 3 complete, awaiting review |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -82,14 +83,15 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 
 - Dev-only moderate advisory in `typescript-eslint` → `minimatch` (lint tooling only). Production audit: 0 vulnerabilities.
 - Rate limiting uses an in-memory store (single instance by design, TD-24).
-- CI workflow is written but has not run yet (no GitHub remote configured).
+- Phase 3 decisions: customers hard-delete allowed only while unreferenced (under `customers.archive`); setting `costPrice` requires `products.view_cost`; product stock states are IN_STOCK / LOW / OUT (mutually exclusive). Product images stored under `UPLOAD_DIR` (`multer` 2 added).
+- GitHub remote `origin` configured; CI runs on GitHub Actions (lockfile synced with npm 10 for `npm ci`).
 
 ## Test status
 
 | Suite | Tests | Result |
 |-------|-------|--------|
-| Unit | 39 | ✅ |
-| Integration (PostgreSQL 16) | 38 | ✅ |
+| Unit | 53 | ✅ |
+| Integration (PostgreSQL 16) | 100 | ✅ (2026-11-09) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
 | E2E | – | Phase 8 |
 

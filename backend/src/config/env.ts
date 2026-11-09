@@ -41,6 +41,9 @@ const envSchema = z
     SMTP_PASS: z.string().optional(),
     MAIL_FROM: z.string().default('Inventory System <no-reply@inventory.local>'),
 
+    /** Product images (TD-20). Relative paths resolve against the backend working directory. */
+    UPLOAD_DIR: z.string().min(1).default('uploads'),
+
     SWAGGER_ENABLED: booleanString.optional(),
     OPENAPI_SPEC_PATH: z.string().optional(),
   })
