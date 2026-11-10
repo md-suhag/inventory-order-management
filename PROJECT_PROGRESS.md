@@ -13,7 +13,7 @@ _Last updated: 2026-11-10_
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
 | 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ✅ Approved & merged 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
-| 7 · Frontend | ✅ Complete 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
+| 7 · Frontend | ✅ Approved & merged 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
 | 8 · Testing & hardening | ⏳ | |
 | 9 · Deployment preparation | ⏳ | |
 | 10 · Final review | ⏳ | |
@@ -42,8 +42,9 @@ _Last updated: 2026-11-10_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Review Phase 7 frontend (`phase-7/frontend` branch) and run manual/E2E verification.
-2. Proceed to Phase 8: Testing & Hardening (unit/component checks, Playwright E2E workflows, security & performance review).
+1. Create branch `phase-8/testing-hardening` from `main` for Phase 8: Testing & Hardening.
+2. Add frontend unit/component tests and Playwright E2E coverage across core business workflows, plus security & performance hardening.
+3. Update `PROJECT_PROGRESS.md` and prepare for owner review.
 
 ## Phase 2 deliverables
 
@@ -71,8 +72,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–6 complete |
-| `phase-7/frontend` | Phase 7 complete (ready for review) |
+| `main` | Phase 0–7 complete |
+| `phase-8/testing-hardening` | Phase 8 (next) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
