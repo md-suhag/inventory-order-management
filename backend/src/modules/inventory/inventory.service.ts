@@ -391,7 +391,10 @@ export async function createAdjustment(
 ): Promise<AdjustmentResult> {
   return withIdempotentTransaction(
     async (tx) => {
-      // 1. Idempotency replay check (BR-IDEM-01)
+      // 1. Lock target product row first so concurrent retries serialize before checking idempotency/stock
+      await tx.$queryRaw`SELECT id FROM products WHERE id = ${input.productId}::uuid FOR UPDATE`;
+
+      // 2. Idempotency replay check under lock (BR-IDEM-01)
       if (idempotencyKey) {
         const replayed = await findReplayedAdjustment(tx, input, viewer, idempotencyKey);
         if (replayed) return replayed;

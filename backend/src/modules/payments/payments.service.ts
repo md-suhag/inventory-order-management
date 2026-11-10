@@ -153,46 +153,47 @@ export async function recordOrderPayment(
 
   return withIdempotentTransaction(
     async (tx) => {
-      // 1. Idempotency replay check (BR-IDEM-01, BR-PAY-09)
+      // 1. Lock order header first so concurrent retries serialize before reading balance/idempotency (BR-PAY-07, BR-CONC-01)
+      const [order] = await tx.$queryRaw<
+        {
+          id: string;
+          status: OrderStatus;
+          total_amount: Prisma.Decimal;
+          returned_amount: Prisma.Decimal;
+          paid_amount: Prisma.Decimal;
+          refunded_amount: Prisma.Decimal;
+        }[]
+      >`
+        SELECT id, status, total_amount, returned_amount, paid_amount, refunded_amount
+        FROM orders
+        WHERE id = ${orderId}::uuid
+        FOR UPDATE`;
+
+      // 2. Idempotency replay check under lock (BR-IDEM-01, BR-PAY-09)
       if (idempotencyKey) {
         const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
         if (replayed) return replayed;
       }
 
-    // 2. Validate payment method (BR-PAY-10)
-    const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
-    if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
-    if (!method.isActive) {
-      throw businessRule('Payment method is not active', [
-        { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
-      ]);
-    }
+      if (!order) throw notFound('Order');
 
-    // 3. Validate paidAt (cannot be in the future, BR-PAY-10)
-    const now = new Date();
-    const paidAt = input.paidAt ? new Date(input.paidAt) : now;
-    if (paidAt.getTime() > now.getTime() + 60_000) {
-      throw businessRule('Payment date cannot be in the future', [
-        { field: 'paidAt', message: 'paidAt cannot be in the future' },
-      ]);
-    }
+      // 3. Validate payment method (BR-PAY-10)
+      const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
+      if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
+      if (!method.isActive) {
+        throw businessRule('Payment method is not active', [
+          { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
+        ]);
+      }
 
-    // 4. Lock order header (BR-PAY-07, BR-CONC-01)
-    const [order] = await tx.$queryRaw<
-      {
-        id: string;
-        status: OrderStatus;
-        total_amount: Prisma.Decimal;
-        returned_amount: Prisma.Decimal;
-        paid_amount: Prisma.Decimal;
-        refunded_amount: Prisma.Decimal;
-      }[]
-    >`
-      SELECT id, status, total_amount, returned_amount, paid_amount, refunded_amount
-      FROM orders
-      WHERE id = ${orderId}::uuid
-      FOR UPDATE`;
-    if (!order) throw notFound('Order');
+      // 4. Validate paidAt (cannot be in the future, BR-PAY-10)
+      const now = new Date();
+      const paidAt = input.paidAt ? new Date(input.paidAt) : now;
+      if (paidAt.getTime() > now.getTime() + 60_000) {
+        throw businessRule('Payment date cannot be in the future', [
+          { field: 'paidAt', message: 'paidAt cannot be in the future' },
+        ]);
+      }
 
     // Customer payments allowed on CONFIRMED, SHIPPED, DELIVERED, COMPLETED (BR-PAY-02)
     const allowedStatuses: OrderStatus[] = ['CONFIRMED', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
@@ -296,46 +297,47 @@ export async function recordOrderRefund(
 
   return withIdempotentTransaction(
     async (tx) => {
-      // 1. Idempotency replay check
+      // 1. Lock order header first so concurrent retries serialize before reading balance/idempotency
+      const [order] = await tx.$queryRaw<
+        {
+          id: string;
+          status: OrderStatus;
+          total_amount: Prisma.Decimal;
+          returned_amount: Prisma.Decimal;
+          paid_amount: Prisma.Decimal;
+          refunded_amount: Prisma.Decimal;
+        }[]
+      >`
+        SELECT id, status, total_amount, returned_amount, paid_amount, refunded_amount
+        FROM orders
+        WHERE id = ${orderId}::uuid
+        FOR UPDATE`;
+
+      // 2. Idempotency replay check under lock
       if (idempotencyKey) {
         const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
         if (replayed) return replayed;
       }
 
-    // 2. Validate payment method
-    const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
-    if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
-    if (!method.isActive) {
-      throw businessRule('Payment method is not active', [
-        { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
-      ]);
-    }
+      if (!order) throw notFound('Order');
 
-    // 3. Validate paidAt
-    const now = new Date();
-    const paidAt = input.paidAt ? new Date(input.paidAt) : now;
-    if (paidAt.getTime() > now.getTime() + 60_000) {
-      throw businessRule('Payment date cannot be in the future', [
-        { field: 'paidAt', message: 'paidAt cannot be in the future' },
-      ]);
-    }
+      // 3. Validate payment method
+      const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
+      if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
+      if (!method.isActive) {
+        throw businessRule('Payment method is not active', [
+          { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
+        ]);
+      }
 
-    // 4. Lock order header
-    const [order] = await tx.$queryRaw<
-      {
-        id: string;
-        status: OrderStatus;
-        total_amount: Prisma.Decimal;
-        returned_amount: Prisma.Decimal;
-        paid_amount: Prisma.Decimal;
-        refunded_amount: Prisma.Decimal;
-      }[]
-    >`
-      SELECT id, status, total_amount, returned_amount, paid_amount, refunded_amount
-      FROM orders
-      WHERE id = ${orderId}::uuid
-      FOR UPDATE`;
-    if (!order) throw notFound('Order');
+      // 4. Validate paidAt
+      const now = new Date();
+      const paidAt = input.paidAt ? new Date(input.paidAt) : now;
+      if (paidAt.getTime() > now.getTime() + 60_000) {
+        throw businessRule('Payment date cannot be in the future', [
+          { field: 'paidAt', message: 'paidAt cannot be in the future' },
+        ]);
+      }
 
     // 5. Refund limit check (BR-PAY-04)
     const amount = new Prisma.Decimal(input.amount);
@@ -474,29 +476,30 @@ export async function reversePayment(
 
   return withIdempotentTransaction(
     async (tx) => {
-      // 1. Idempotency replay check
+      // 1. Lock original payment first so concurrent retries serialize (BR-CONC-01)
+      const [original] = await tx.$queryRaw<
+        {
+          id: string;
+          payment_number: string;
+          type: PaymentType;
+          order_id: string | null;
+          purchase_id: string | null;
+          payment_method_id: string;
+          amount: Prisma.Decimal;
+        }[]
+      >`
+        SELECT id, payment_number, type, order_id, purchase_id, payment_method_id, amount
+        FROM payments
+        WHERE id = ${id}::uuid
+        FOR UPDATE`;
+
+      // 2. Idempotency replay check under lock
       if (idempotencyKey) {
         const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
         if (replayed) return replayed;
       }
 
-    // 2. Lock original payment (BR-CONC-01)
-    const [original] = await tx.$queryRaw<
-      {
-        id: string;
-        payment_number: string;
-        type: PaymentType;
-        order_id: string | null;
-        purchase_id: string | null;
-        payment_method_id: string;
-        amount: Prisma.Decimal;
-      }[]
-    >`
-      SELECT id, payment_number, type, order_id, purchase_id, payment_method_id, amount
-      FROM payments
-      WHERE id = ${id}::uuid
-      FOR UPDATE`;
-    if (!original) throw notFound('Payment');
+      if (!original) throw notFound('Payment');
 
     if (original.type === 'REVERSAL') {
       throw conflict('Cannot reverse a reversal transaction', ErrorCode.INVALID_STATE_TRANSITION);

@@ -364,30 +364,30 @@ export async function createSalesReturn(
 ): Promise<{ replayed: boolean; salesReturn: SalesReturnDetail }> {
   return withIdempotentTransaction(
     async (tx) => {
-      // 1. Idempotency replay check
+      // 1. Lock order header first so concurrent retries serialize before reading returnable qty (BR-CONC-01)
+      const [order] = await tx.$queryRaw<
+        {
+          id: string;
+          order_number: string;
+          status: string;
+          total_amount: Prisma.Decimal;
+          returned_amount: Prisma.Decimal;
+          paid_amount: Prisma.Decimal;
+          refunded_amount: Prisma.Decimal;
+        }[]
+      >`
+        SELECT id, order_number, status, total_amount, returned_amount, paid_amount, refunded_amount
+        FROM orders
+        WHERE id = ${input.orderId}::uuid
+        FOR UPDATE`;
+
+      // 2. Idempotency replay check under lock
       if (idempotencyKey) {
         const replayed = await findReplayedSalesReturn(tx, input, idempotencyKey);
         if (replayed) return replayed;
       }
 
-    // 2. Validate order exists and lock order header (BR-CONC-01)
-    const [order] = await tx.$queryRaw<
-      {
-        id: string;
-        order_number: string;
-        status: string;
-        total_amount: Prisma.Decimal;
-        returned_amount: Prisma.Decimal;
-        paid_amount: Prisma.Decimal;
-        refunded_amount: Prisma.Decimal;
-      }[]
-    >`
-      SELECT id, order_number, status, total_amount, returned_amount, paid_amount, refunded_amount
-      FROM orders
-      WHERE id = ${input.orderId}::uuid
-      FOR UPDATE`;
-
-    if (!order) throw notFound('Order');
+      if (!order) throw notFound('Order');
 
     // BR-RET-01: Returns are allowed only for delivered or completed orders
     const allowedStatuses = ['DELIVERED', 'COMPLETED'];

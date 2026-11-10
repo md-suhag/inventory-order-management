@@ -815,15 +815,16 @@ export async function receiveGoods(
 ): Promise<ReceiveGoodsResult> {
   return withIdempotentTransaction(
     async (tx) => {
-      // 1. Idempotency replay check (BR-IDEM-01, BR-PUR-07)
+      // 1. Lock purchase header first so concurrent retries serialize before reading state (BR-CONC-01)
+      const [purchase] = await tx.$queryRaw<{ id: string; status: PurchaseStatus }[]>`
+        SELECT id, status FROM purchases WHERE id = ${id}::uuid FOR UPDATE`;
+
+      // 2. Idempotency replay check under lock (BR-IDEM-01, BR-PUR-07)
       if (idempotencyKey) {
         const replayed = await findReplayedReceipt(tx, id, input, idempotencyKey);
         if (replayed) return replayed;
       }
 
-      // 2. Lock purchase header first (BR-CONC-01)
-      const [purchase] = await tx.$queryRaw<{ id: string; status: PurchaseStatus }[]>`
-        SELECT id, status FROM purchases WHERE id = ${id}::uuid FOR UPDATE`;
       if (!purchase) throw notFound('Purchase');
 
       if (purchase.status !== 'ORDERED' && purchase.status !== 'PARTIALLY_RECEIVED') {
