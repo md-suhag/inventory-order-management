@@ -75,11 +75,20 @@ test.describe('End-to-end Inventory & Order Management workflow', () => {
     await expect(page).toHaveURL(/\/purchases\/[0-9a-f-]+$/);
     await page.getByRole('button', { name: 'Confirm Order' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm Order' }).click();
-    await expect(page.getByText('Ordered', { exact: true })).toBeVisible();
+    await expect(page.getByRole('alertdialog')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Receive Goods' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Receive Goods' }).click();
     await page.getByRole('dialog').getByRole('button', { name: 'Record Goods Receipt' }).click();
-    await expect(page.getByText('Received', { exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByText('Goods Receipts (1)')).toBeVisible();
+
+    // 4b. Record supplier payment against received purchase
+    await page.getByRole('button', { name: 'Record Payment' }).click();
+    await expect(page.locator('#sup-pay-amount')).not.toHaveValue('');
+    await page.getByRole('dialog').getByRole('button', { name: 'Record Payment' }).click();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByText('Payments, Refunds & Reversals (1)')).toBeVisible();
 
     // 5. Verify inventory increased to 10
     await page.goto(`/inventory?search=${sku}`);
@@ -109,15 +118,18 @@ test.describe('End-to-end Inventory & Order Management workflow', () => {
 
     await page.getByRole('button', { name: 'Confirm Order' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click();
+    await expect(page.getByRole('alertdialog')).toBeHidden();
     await expect(page.getByText('Confirmed', { exact: true })).toBeVisible();
 
     await page.getByRole('button', { name: 'Record Payment' }).click();
     await expect(page.locator('#pay-amount')).not.toHaveValue('');
     await page.getByRole('dialog').getByRole('button', { name: 'Record Payment' }).click();
-    await expect(page.getByText('Paid', { exact: true })).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeHidden();
+    await expect(page.getByText('Payments, Refunds & Reversals (1)')).toBeVisible();
 
     await page.getByRole('button', { name: 'Complete' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click();
+    await expect(page.getByRole('alertdialog')).toBeHidden();
     await expect(page.getByText('Completed', { exact: true })).toBeVisible();
 
     await page.getByRole('link', { name: 'Invoice' }).click();
@@ -135,6 +147,7 @@ test.describe('End-to-end Inventory & Order Management workflow', () => {
     await expect(page).toHaveURL(/\/sales-returns\/[0-9a-f-]+$/);
     await page.getByRole('button', { name: 'Approve & Complete' }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: 'Complete Return' }).click();
+    await expect(page.getByRole('alertdialog')).toBeHidden();
     await expect(page.getByText('Completed', { exact: true })).toBeVisible();
     await expect(page.getByText('SALE_RETURN')).toBeVisible();
 

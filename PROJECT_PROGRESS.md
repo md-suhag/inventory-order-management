@@ -40,10 +40,9 @@ _Last updated: 2026-11-10_
 
 ## Next steps (handoff — start here)
 
-Phase 10 Final Review is complete on `phase-10/final-review` (see `docs/FINAL_REVIEW.md`). Optional final manual verification before tagging/releasing:
+Phase 10 Final Review is complete on `phase-10/final-review` (see `docs/FINAL_REVIEW.md`). All backend unit/integration tests, frontend unit tests, Playwright E2E browser tests, builds, lints, typechecks, and production dependency audits passed.
 
-1. Run live-stack Playwright E2E (`cd frontend && npx playwright test`) against running backend + frontend servers.
-2. Fast-forward merge `phase-10/final-review` into `main` once approved (`git checkout main && git merge --ff-only phase-10/final-review`).
+1. Fast-forward merge `phase-10/final-review` into `main` once approved (`git checkout main && git merge --ff-only phase-10/final-review`).
 
 ## Phase 2 deliverables
 

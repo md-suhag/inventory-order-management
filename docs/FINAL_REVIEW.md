@@ -15,7 +15,7 @@
 | 5. ERD consistency | Complete | Regenerated `ERD.drawio` via `generate-erd.mjs` for `20261109120000_order_fulfillment` and re-exported `ERD.svg`/`ERD.png` + `ERD-3-sales-payments-returns.svg`/`png`. |
 | 6. API documentation | Complete | 81 paths / 112 operations in `openapi.yaml` and `API_DESIGN.md`; 100% parity verified by `platform.test.ts`. |
 | 7. Security | Complete | bcrypt (cost 12, 72-byte limit), JWT + rotating refresh families, rate limiting + lockout, magic-byte MIME check, CSP/security headers, `redact` logs, `harden-app-role.sql`, 0 high prod vulnerabilities. |
-| 8. Tests | Complete (E2E pending live run) | Backend: 28 files / 230 tests pass against PG 16. Frontend unit: 4 files / 18 tests pass. Playwright E2E (`workflow.spec.ts`) verified statically, pending manual live-stack run. |
+| 8. Tests | Complete | Backend: 28 files / 230 tests pass against PG 16. Frontend unit: 4 files / 18 tests pass. Playwright E2E (`workflow.spec.ts`): 2 / 2 tests pass in Chromium against compiled backend + Next.js servers. |
 | 9. Deployment readiness | Complete | Multi-stage non-root Dockerfiles, Compose dev/prod configs validated, `.env.prod.example`, DB hardening SQL, backup/restore scripts, 3-job GitHub Actions CI. |
 | 10. README & documentation | Complete | All 15+ project docs present with 0 broken internal markdown links; fixed stale references in `SYSTEM_ARCHITECTURE.md` & `DATABASE_DESIGN.md`. |
 
@@ -72,7 +72,7 @@
 ### 8–9. Tests & Deployment Readiness Verification
 - [x] **Backend Test Suite (`backend/` — `npm test -- --reporter=dot`):** **28 test files / 230 tests passed** against PostgreSQL 16 (7 unit files + 21 integration files, covering all 8 critical concurrency/idempotency/rollback/RBAC scenarios in `critical-scenarios.test.ts`, OpenAPI parity in `platform.test.ts`, and supplier payment/refund/reversal/RBAC flows in `payments.test.ts`).
 - [x] **Frontend Unit Tests (`frontend/` — `npm test`):** **4 test files / 18 tests passed** (`security-and-csv`, `format`, `permissions-and-cookies`, `components`).
-- [ ] **Playwright Browser E2E (`frontend/e2e/workflow.spec.ts`):** Statically linted/typechecked cleanly (2 scenarios: auth redirect + invalid credentials; full purchase → stock → order → customer payment → invoice → sales return → inventory & reports), **not executed against live Docker/dev servers in Phase 10** (manual live-stack verification recommended before production release; E2E spec also does not yet exercise the newly added supplier payment UI).
+- [x] **Playwright Browser E2E (`frontend/e2e/workflow.spec.ts`):** **2 / 2 tests passed** in Chromium (`12.2s`) against compiled `node dist/server.js` + `next start` (auth redirect + invalid credentials; full purchase → confirm → receive → **supplier payment** → inventory → customer order → confirm → customer payment → complete → invoice → sales return & restock → net inventory & reports verification). Fixed three exact-text race assertions in `workflow.spec.ts` (`Ordered`/`Received`/`Paid` matching existing headings before mutation completion) and added supplier payment browser coverage.
 - [x] **Containers & CI (`.github/workflows/ci.yml`, `docker-compose*.yml`):** `docker compose config -q` and `docker compose -f docker-compose.prod.yml --env-file .env.prod.example config -q` both exited `0`; production Docker image builds run in the CI `docker` job (`ubuntu-latest`).
 
 ---
