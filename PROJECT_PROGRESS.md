@@ -15,7 +15,7 @@ _Last updated: 2026-11-10_
 | 6 · Returns, reports, audit, settings | ✅ Approved & merged 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
 | 7 · Frontend | ✅ Approved & merged 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
 | 8 · Testing & hardening | ✅ Approved & merged 2026-11-10 | Critical concurrency/idempotency/rollback integration tests, payment/return/route-security unit tests, frontend Vitest + Testing Library suite, Playwright E2E workflow, backend lock/idempotency fixes, frontend security headers & CSV/open-redirect hardening |
-| 9 · Deployment preparation | ✅ Complete (pending review) 2026-11-10 | Multi-stage non-root Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`), `docker-compose.prod.yml` + fullstack dev profile, `.env.prod.example`, least-privilege DB role SQL (`scripts/db/harden-app-role.sql`), backup/restore scripts, `DEPLOYMENT.md`, README & CI Docker verification |
+| 9 · Deployment preparation | ✅ Approved & merged 2026-11-10 | Multi-stage non-root Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`), `docker-compose.prod.yml` + fullstack dev profile, `.env.prod.example`, least-privilege DB role SQL (`scripts/db/harden-app-role.sql`), backup/restore scripts, `DEPLOYMENT.md`, README & CI Docker verification |
 | 10 · Final review | ⏳ | |
 
 ## Modules
@@ -42,8 +42,8 @@ _Last updated: 2026-11-10_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Review Phase 9 deployment artifacts (`phase-9/deployment` branch) and merge to `main`.
-2. Proceed to Phase 10: Final Review (requirements coverage checklist, backend/frontend/DB/ERD/API/security/test/deployment audit).
+1. Create branch `phase-10/final-review` from `main` for Phase 10: Final Review.
+2. Audit functional requirements, backend/frontend quality, DB/ERD/API parity, security, tests, deployment readiness, and produce the final completion checklist.
 
 ## Phase 2 deliverables
 
@@ -71,8 +71,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–8 complete |
-| `phase-9/deployment` | Phase 9 complete (ready for review) |
+| `main` | Phase 0–9 complete |
+| `phase-10/final-review` | Phase 10 (next) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
