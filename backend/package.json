@@ -1,6 +1,6 @@
 {
   "name": "inventory-backend",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "description": "Mini Inventory & Order Management System — REST API",
   "main": "dist/server.js",

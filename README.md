@@ -105,6 +105,6 @@ docker-compose.prod.yml  production PostgreSQL, migrate, backend, frontend stack
 | Security | [docs/security/SECURITY.md](docs/security/SECURITY.md) |
 | Testing | [docs/testing/TESTING_STRATEGY.md](docs/testing/TESTING_STRATEGY.md) |
 | Deployment | [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) |
-| Final review | [Phase 10 completion checklist](docs/FINAL_REVIEW.md) · [Progress log](PROJECT_PROGRESS.md) |
+| Final review & release | [Phase 10 checklist](docs/FINAL_REVIEW.md) · [Changelog](CHANGELOG.md) · [Progress log](PROJECT_PROGRESS.md) |
 
 ![Database overview](docs/diagrams/ERD.png)

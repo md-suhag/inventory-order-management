@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Verify tag & publish GitHub Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches package & OpenAPI versions
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          BE_VER=$(node -p "require('./backend/package.json').version")
+          FE_VER=$(node -p "require('./frontend/package.json').version")
+          API_VER=$(grep -E '^  version:' docs/api/openapi.yaml | head -n1 | awk '{print $2}')
+          echo "Tag=$TAG_VERSION Backend=$BE_VER Frontend=$FE_VER OpenAPI=$API_VER"
+          if [ "$BE_VER" != "$TAG_VERSION" ] || [ "$FE_VER" != "$TAG_VERSION" ] || [ "$API_VER" != "$TAG_VERSION" ]; then
+            echo "Version mismatch with tag $GITHUB_REF_NAME" >&2
+            exit 1
+          fi
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          node -e '
+            const fs = require("fs");
+            const ver = process.argv[1];
+            const md = fs.readFileSync("CHANGELOG.md", "utf8");
+            const esc = ver.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            const re = new RegExp(`## \\[${esc}\\][^\\n]*\\n([\\s\\S]*?)(?=\\n## \\[|$)`);
+            const m = md.match(re);
+            const notes = m ? m[1].trim() : `Production release ${process.env.GITHUB_REF_NAME}. See docs/FINAL_REVIEW.md and CHANGELOG.md.`;
+            fs.writeFileSync("release-notes.md", notes + "\n");
+          ' "$TAG_VERSION"
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes-file release-notes.md \
+            --verify-tag
