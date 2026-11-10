@@ -1,7 +1,7 @@
 import { Prisma, type AdjustmentReason, type InventoryMovementType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { recordAudit, type RequestContext } from '../../common/audit/audit';
-import { withTransaction, type Tx } from '../../common/db/transaction';
+import { withIdempotentTransaction, type Tx } from '../../common/db/transaction';
 import { AppError, ErrorCode, businessRule, notFound } from '../../common/errors/app-error';
 import { buildListArgs, paginate, type Paginated } from '../../common/query/list-query';
 import { publicUserSelect } from '../users/users.presenter';
@@ -343,93 +343,108 @@ function formatMovement(
   };
 }
 
+async function findReplayedAdjustment(
+  db: Tx | typeof prisma,
+  input: CreateAdjustmentInput,
+  viewer: Viewer,
+  idempotencyKey: string,
+): Promise<AdjustmentResult | null> {
+  const existing = await db.inventoryMovement.findUnique({
+    where: { idempotencyKey },
+    include: {
+      product: { select: { name: true, sku: true } },
+      performedBy: { select: publicUserSelect },
+      purchaseReceipt: { select: { receiptNumber: true } },
+      order: { select: { orderNumber: true } },
+    },
+  });
+  if (!existing) return null;
+
+  const expectedType = input.direction === 'IN' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
+  const expectedChange = input.direction === 'IN' ? input.quantity : -input.quantity;
+
+  const isMatch =
+    existing.productId === input.productId &&
+    existing.type === expectedType &&
+    existing.quantityChange === expectedChange &&
+    existing.adjustmentReason === input.reason;
+
+  if (!isMatch) {
+    throw new AppError(
+      422,
+      ErrorCode.IDEMPOTENCY_KEY_REUSED,
+      'Idempotency key was already used with a different request payload',
+    );
+  }
+
+  return {
+    replayed: true,
+    movement: formatMovement(existing, viewer),
+  };
+}
+
 export async function createAdjustment(
   input: CreateAdjustmentInput,
   ctx: RequestContext,
   viewer: Viewer,
   idempotencyKey?: string,
 ): Promise<AdjustmentResult> {
-  // 1. Idempotency replay check (BR-IDEM-01)
-  if (idempotencyKey) {
-    const existing = await prisma.inventoryMovement.findUnique({
-      where: { idempotencyKey },
-      include: {
-        product: { select: { name: true, sku: true } },
-        performedBy: { select: publicUserSelect },
-        purchaseReceipt: { select: { receiptNumber: true } },
-        order: { select: { orderNumber: true } },
-      },
-    });
-
-    if (existing) {
-      const expectedType = input.direction === 'IN' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
-      const expectedChange = input.direction === 'IN' ? input.quantity : -input.quantity;
-
-      const isMatch =
-        existing.productId === input.productId &&
-        existing.type === expectedType &&
-        existing.quantityChange === expectedChange &&
-        existing.adjustmentReason === input.reason;
-
-      if (!isMatch) {
-        throw new AppError(
-          422,
-          ErrorCode.IDEMPOTENCY_KEY_REUSED,
-          'Idempotency key was already used with a different request payload',
-        );
+  return withIdempotentTransaction(
+    async (tx) => {
+      // 1. Idempotency replay check (BR-IDEM-01)
+      if (idempotencyKey) {
+        const replayed = await findReplayedAdjustment(tx, input, viewer, idempotencyKey);
+        if (replayed) return replayed;
       }
 
-      return {
-        replayed: true,
-        movement: formatMovement(existing, viewer),
-      };
-    }
-  }
+      const movementType: InventoryMovementType =
+        input.direction === 'IN' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
 
-  // 2. Perform adjustment in interactive transaction
-  return withTransaction(async (tx) => {
-    const movementType: InventoryMovementType =
-      input.direction === 'IN' ? 'ADJUSTMENT_IN' : 'ADJUSTMENT_OUT';
-
-    const result = await applyMovement(tx, {
-      productId: input.productId,
-      type: movementType,
-      quantity: input.quantity,
-      performedById: ctx.actorId!,
-      adjustmentReason: input.reason,
-      notes: input.notes,
-      idempotencyKey,
-    });
-
-    await recordAudit(tx, ctx, {
-      action: 'inventory.adjusted',
-      entityType: 'inventory_movement',
-      entityId: result.movementId,
-      metadata: {
+      const result = await applyMovement(tx, {
         productId: input.productId,
-        direction: input.direction,
+        type: movementType,
         quantity: input.quantity,
-        reason: input.reason,
-        previousStock: result.previousStock,
-        resultingStock: result.resultingStock,
-      },
-    });
+        performedById: ctx.actorId!,
+        adjustmentReason: input.reason,
+        notes: input.notes,
+        idempotencyKey,
+      });
 
-    const movement = await tx.inventoryMovement.findUnique({
-      where: { id: result.movementId },
-      include: {
-        product: { select: { name: true, sku: true } },
-        performedBy: { select: publicUserSelect },
-        purchaseReceipt: { select: { receiptNumber: true } },
-        order: { select: { orderNumber: true } },
-      },
-    });
+      await recordAudit(tx, ctx, {
+        action: 'inventory.adjusted',
+        entityType: 'inventory_movement',
+        entityId: result.movementId,
+        metadata: {
+          productId: input.productId,
+          direction: input.direction,
+          quantity: input.quantity,
+          reason: input.reason,
+          previousStock: result.previousStock,
+          resultingStock: result.resultingStock,
+        },
+      });
 
-    return {
-      replayed: false,
-      movement: formatMovement(movement!, viewer),
-    };
-  });
+      const movement = await tx.inventoryMovement.findUnique({
+        where: { id: result.movementId },
+        include: {
+          product: { select: { name: true, sku: true } },
+          performedBy: { select: publicUserSelect },
+          purchaseReceipt: { select: { receiptNumber: true } },
+          order: { select: { orderNumber: true } },
+        },
+      });
+
+      return {
+        replayed: false,
+        movement: formatMovement(movement!, viewer),
+      };
+    },
+    {
+      idempotencyKey,
+      onReplay: () =>
+        idempotencyKey ? findReplayedAdjustment(prisma, input, viewer, idempotencyKey) : Promise.resolve(null),
+    },
+  );
 }
 
 export async function listMovements(

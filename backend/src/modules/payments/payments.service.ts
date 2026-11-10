@@ -1,7 +1,7 @@
 import { Prisma, type OrderStatus, type PaymentStatus, type PaymentType } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { recordAudit, type RequestContext } from '../../common/audit/audit';
-import { withTransaction } from '../../common/db/transaction';
+import { withIdempotentTransaction, type Tx } from '../../common/db/transaction';
 import { ErrorCode, businessRule, conflict, invalidReference, notFound } from '../../common/errors/app-error';
 import { buildListArgs, paginate, type Paginated } from '../../common/query/list-query';
 import { nextDocumentNumber } from '../../common/sequence/document-sequence';
@@ -121,38 +121,43 @@ export function computeOrderPaymentStatus(
   return 'PARTIALLY_PAID';
 }
 
+type PaymentRow = Prisma.PaymentGetPayload<{ select: typeof paymentSelect }>;
+
+async function findReplayedPayment(
+  db: Tx | typeof prisma,
+  idempotencyKey: string,
+  matches: (existing: PaymentRow) => boolean,
+): Promise<{ replayed: boolean; payment: PaymentDetail } | null> {
+  const existing = await db.payment.findUnique({
+    where: { idempotencyKey },
+    select: paymentSelect,
+  });
+  if (!existing) return null;
+  if (!matches(existing)) {
+    throw conflict('Idempotency key reused with different payload', ErrorCode.IDEMPOTENCY_KEY_REUSED);
+  }
+  return { replayed: true, payment: mapPayment(existing) };
+}
+
 export async function recordOrderPayment(
   orderId: string,
   input: RecordPaymentInput,
   ctx: RequestContext,
   idempotencyKey?: string,
 ): Promise<{ replayed: boolean; payment: PaymentDetail }> {
-  return withTransaction(async (tx) => {
-    // 1. Idempotency replay check (BR-IDEM-01, BR-PAY-09)
-    if (idempotencyKey) {
-      const existing = await tx.payment.findUnique({
-        where: { idempotencyKey },
-        include: {
-          paymentMethod: { select: { id: true, code: true, name: true } },
-          recordedBy: { select: publicUserSelect },
-          reversal: { select: { id: true, paymentNumber: true, createdAt: true } },
-        },
-      });
+  const matches = (existing: PaymentRow) =>
+    existing.orderId === orderId &&
+    existing.paymentMethod.id === input.paymentMethodId &&
+    new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
+    existing.type === 'PAYMENT';
 
-      if (existing) {
-        const matches =
-          existing.orderId === orderId &&
-          existing.paymentMethodId === input.paymentMethodId &&
-          new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
-          existing.type === 'PAYMENT';
-
-        if (!matches) {
-          throw conflict('Idempotency key reused with different payload', ErrorCode.IDEMPOTENCY_KEY_REUSED);
-        }
-
-        return { replayed: true, payment: mapPayment(existing) };
+  return withIdempotentTransaction(
+    async (tx) => {
+      // 1. Idempotency replay check (BR-IDEM-01, BR-PAY-09)
+      if (idempotencyKey) {
+        const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
+        if (replayed) return replayed;
       }
-    }
 
     // 2. Validate payment method (BR-PAY-10)
     const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
@@ -268,6 +273,11 @@ export async function recordOrderPayment(
     });
 
     return { replayed: false, payment: mapPayment(payment) };
+  },
+  {
+    idempotencyKey,
+    onReplay: () =>
+      idempotencyKey ? findReplayedPayment(prisma, idempotencyKey, matches) : Promise.resolve(null),
   });
 }
 
@@ -277,33 +287,20 @@ export async function recordOrderRefund(
   ctx: RequestContext,
   idempotencyKey?: string,
 ): Promise<{ replayed: boolean; payment: PaymentDetail }> {
-  return withTransaction(async (tx) => {
-    // 1. Idempotency replay check
-    if (idempotencyKey) {
-      const existing = await tx.payment.findUnique({
-        where: { idempotencyKey },
-        include: {
-          paymentMethod: { select: { id: true, code: true, name: true } },
-          recordedBy: { select: publicUserSelect },
-          reversal: { select: { id: true, paymentNumber: true, createdAt: true } },
-        },
-      });
+  const matches = (existing: PaymentRow) =>
+    existing.orderId === orderId &&
+    existing.paymentMethod.id === input.paymentMethodId &&
+    new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
+    existing.type === 'REFUND' &&
+    existing.salesReturnId === (input.salesReturnId ?? null);
 
-      if (existing) {
-        const matches =
-          existing.orderId === orderId &&
-          existing.paymentMethodId === input.paymentMethodId &&
-          new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
-          existing.type === 'REFUND' &&
-          existing.salesReturnId === (input.salesReturnId ?? null);
-
-        if (!matches) {
-          throw conflict('Idempotency key reused with different payload', ErrorCode.IDEMPOTENCY_KEY_REUSED);
-        }
-
-        return { replayed: true, payment: mapPayment(existing) };
+  return withIdempotentTransaction(
+    async (tx) => {
+      // 1. Idempotency replay check
+      if (idempotencyKey) {
+        const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
+        if (replayed) return replayed;
       }
-    }
 
     // 2. Validate payment method
     const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
@@ -458,6 +455,11 @@ export async function recordOrderRefund(
     });
 
     return { replayed: false, payment: mapPayment(payment) };
+  },
+  {
+    idempotencyKey,
+    onReplay: () =>
+      idempotencyKey ? findReplayedPayment(prisma, idempotencyKey, matches) : Promise.resolve(null),
   });
 }
 
@@ -467,24 +469,16 @@ export async function reversePayment(
   ctx: RequestContext,
   idempotencyKey?: string,
 ): Promise<{ replayed: boolean; payment: PaymentDetail }> {
-  return withTransaction(async (tx) => {
-    // 1. Idempotency replay check
-    if (idempotencyKey) {
-      const existing = await tx.payment.findUnique({
-        where: { idempotencyKey },
-        include: {
-          paymentMethod: { select: { id: true, code: true, name: true } },
-          recordedBy: { select: publicUserSelect },
-        },
-      });
+  const matches = (existing: PaymentRow) =>
+    existing.reversedPaymentId === id && existing.type === 'REVERSAL';
 
-      if (existing) {
-        if (existing.reversedPaymentId !== id || existing.type !== 'REVERSAL') {
-          throw conflict('Idempotency key reused with different payload', ErrorCode.IDEMPOTENCY_KEY_REUSED);
-        }
-        return { replayed: true, payment: mapPayment(existing) };
+  return withIdempotentTransaction(
+    async (tx) => {
+      // 1. Idempotency replay check
+      if (idempotencyKey) {
+        const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
+        if (replayed) return replayed;
       }
-    }
 
     // 2. Lock original payment (BR-CONC-01)
     const [original] = await tx.$queryRaw<
@@ -645,6 +639,11 @@ export async function reversePayment(
     });
 
     return { replayed: false, payment: mapPayment(reversal) };
+  },
+  {
+    idempotencyKey,
+    onReplay: () =>
+      idempotencyKey ? findReplayedPayment(prisma, idempotencyKey, matches) : Promise.resolve(null),
   });
 }
 

@@ -1,7 +1,7 @@
 import { Prisma, type ReturnItemCondition, type SalesReturnStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { recordAudit, type RequestContext } from '../../common/audit/audit';
-import { withTransaction, type Tx } from '../../common/db/transaction';
+import { withIdempotentTransaction, withTransaction, type Tx } from '../../common/db/transaction';
 import { ErrorCode, businessRule, conflict, invalidReference, notFound } from '../../common/errors/app-error';
 import { buildListArgs, paginate, type Paginated } from '../../common/query/list-query';
 import { nextDocumentNumber } from '../../common/sequence/document-sequence';
@@ -250,7 +250,7 @@ function mapSalesReturnDetail(ret: {
 /**
  * Calculates line credit according to BR-RET-04.
  */
-function calculateLineCredit(
+export function calculateLineCredit(
   orderItem: {
     quantity: number;
     unitPrice: Prisma.Decimal;
@@ -289,77 +289,86 @@ function calculateLineCredit(
   return { subtotal, taxAmount, totalAmount };
 }
 
+async function findReplayedSalesReturn(
+  db: Tx | typeof prisma,
+  input: CreateSalesReturnInput,
+  idempotencyKey: string,
+): Promise<{ replayed: boolean; salesReturn: SalesReturnDetail } | null> {
+  const existing = await db.salesReturn.findUnique({
+    where: { idempotencyKey },
+    include: {
+      order: {
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          paymentStatus: true,
+          totalAmount: true,
+          returnedAmount: true,
+          paidAmount: true,
+          refundedAmount: true,
+          customer: { select: { id: true, name: true, phone: true, email: true } },
+        },
+      },
+      requestedBy: { select: publicUserSelect },
+      processedBy: { select: publicUserSelect },
+      items: {
+        include: {
+          orderItem: { select: { productId: true, productName: true, productSku: true, unit: true } },
+        },
+      },
+      refunds: {
+        select: {
+          id: true,
+          paymentNumber: true,
+          amount: true,
+          paidAt: true,
+          paymentMethod: { select: { id: true, code: true, name: true } },
+        },
+      },
+      inventoryMovements: {
+        select: { id: true, productId: true, type: true, quantityChange: true, createdAt: true },
+      },
+    },
+  });
+  if (!existing) return null;
+
+  const sameOrder = existing.orderId === input.orderId;
+  const sameReason = existing.reason === input.reason;
+  const sameNotes = (existing.notes ?? null) === (input.notes ?? null);
+  const sameItems =
+    existing.items.length === input.items.length &&
+    input.items.every((it) =>
+      existing.items.some(
+        (ex) =>
+          ex.orderItemId === it.orderItemId &&
+          ex.quantity === it.quantity &&
+          ex.condition === it.condition,
+      ),
+    );
+
+  if (!sameOrder || !sameReason || !sameNotes || !sameItems) {
+    throw conflict(
+      'Idempotency key has already been used with a different request payload',
+      ErrorCode.IDEMPOTENCY_KEY_REUSED,
+    );
+  }
+
+  return { replayed: true, salesReturn: mapSalesReturnDetail(existing) };
+}
+
 export async function createSalesReturn(
   input: CreateSalesReturnInput,
   ctx: RequestContext,
   idempotencyKey?: string,
 ): Promise<{ replayed: boolean; salesReturn: SalesReturnDetail }> {
-  return withTransaction(async (tx) => {
-    // 1. Idempotency replay check
-    if (idempotencyKey) {
-      const existing = await tx.salesReturn.findUnique({
-        where: { idempotencyKey },
-        include: {
-          order: {
-            select: {
-              id: true,
-              orderNumber: true,
-              status: true,
-              paymentStatus: true,
-              totalAmount: true,
-              returnedAmount: true,
-              paidAmount: true,
-              refundedAmount: true,
-              customer: { select: { id: true, name: true, phone: true, email: true } },
-            },
-          },
-          requestedBy: { select: publicUserSelect },
-          processedBy: { select: publicUserSelect },
-          items: {
-            include: {
-              orderItem: { select: { productId: true, productName: true, productSku: true, unit: true } },
-            },
-          },
-          refunds: {
-            select: {
-              id: true,
-              paymentNumber: true,
-              amount: true,
-              paidAt: true,
-              paymentMethod: { select: { id: true, code: true, name: true } },
-            },
-          },
-          inventoryMovements: {
-            select: { id: true, productId: true, type: true, quantityChange: true, createdAt: true },
-          },
-        },
-      });
-
-      if (existing) {
-        const sameOrder = existing.orderId === input.orderId;
-        const sameReason = existing.reason === input.reason;
-        const sameNotes = (existing.notes ?? null) === (input.notes ?? null);
-        const sameItems =
-          existing.items.length === input.items.length &&
-          input.items.every((it) =>
-            existing.items.some(
-              (ex) =>
-                ex.orderItemId === it.orderItemId &&
-                ex.quantity === it.quantity &&
-                ex.condition === it.condition,
-            ),
-          );
-
-        if (!sameOrder || !sameReason || !sameNotes || !sameItems) {
-          throw conflict(
-            'Idempotency key has already been used with a different request payload',
-            ErrorCode.IDEMPOTENCY_KEY_REUSED,
-          );
-        }
-
-        return { replayed: true, salesReturn: mapSalesReturnDetail(existing) };
+  return withIdempotentTransaction(
+    async (tx) => {
+      // 1. Idempotency replay check
+      if (idempotencyKey) {
+        const replayed = await findReplayedSalesReturn(tx, input, idempotencyKey);
+        if (replayed) return replayed;
       }
-    }
 
     // 2. Validate order exists and lock order header (BR-CONC-01)
     const [order] = await tx.$queryRaw<
@@ -531,6 +540,11 @@ export async function createSalesReturn(
 
     const detail = await fetchSalesReturnDetail(tx, created.id);
     return { replayed: false, salesReturn: detail };
+  },
+  {
+    idempotencyKey,
+    onReplay: () =>
+      idempotencyKey ? findReplayedSalesReturn(prisma, input, idempotencyKey) : Promise.resolve(null),
   });
 }
 
@@ -624,21 +638,7 @@ export async function completeSalesReturn(
   ctx: RequestContext,
 ): Promise<SalesReturnDetail> {
   return withTransaction(async (tx) => {
-    // 1. Fetch sales return
-    const salesReturn = await tx.salesReturn.findUnique({
-      where: { id },
-      include: { items: true },
-    });
-    if (!salesReturn) throw notFound('Sales return');
-
-    if (salesReturn.status !== 'PENDING') {
-      throw conflict(
-        `Cannot complete sales return with status ${salesReturn.status}`,
-        ErrorCode.INVALID_STATE_TRANSITION,
-      );
-    }
-
-    // 2. Lock order header (BR-CONC-01)
+    // 1. Lock parent order first, then sales_return row (BR-CONC-01: orders -> sales_returns -> products)
     const [order] = await tx.$queryRaw<
       {
         id: string;
@@ -652,10 +652,27 @@ export async function completeSalesReturn(
     >`
       SELECT id, order_number, status, total_amount, returned_amount, paid_amount, refunded_amount
       FROM orders
-      WHERE id = ${salesReturn.orderId}::uuid
+      WHERE id = (SELECT order_id FROM sales_returns WHERE id = ${id}::uuid)
       FOR UPDATE`;
 
-    if (!order) throw notFound('Order');
+    if (!order) throw notFound('Sales return');
+
+    await tx.$queryRaw`
+      SELECT id FROM sales_returns WHERE id = ${id}::uuid FOR UPDATE`;
+
+    // 2. Fetch sales return under lock so status cannot change concurrently
+    const salesReturn = await tx.salesReturn.findUnique({
+      where: { id },
+      include: { items: true },
+    });
+    if (!salesReturn) throw notFound('Sales return');
+
+    if (salesReturn.status !== 'PENDING') {
+      throw conflict(
+        `Cannot complete sales return with status ${salesReturn.status}`,
+        ErrorCode.INVALID_STATE_TRANSITION,
+      );
+    }
 
     // 3. Fetch order items
     const orderItems = await tx.orderItem.findMany({
@@ -663,17 +680,17 @@ export async function completeSalesReturn(
     });
     const orderItemMap = new Map(orderItems.map((oi) => [oi.id, oi]));
 
-    // 4. Products lock order: lock products for resalable items in ascending order (BR-CONC-01)
+    // 4. Products lock order: lock products for resalable items in ascending ASCII order (BR-CONC-01)
     const resalableItems = salesReturn.items.filter((i) => i.condition === 'RESALABLE');
     const resalableProductIds = [
       ...new Set(resalableItems.map((i) => orderItemMap.get(i.orderItemId)!.productId)),
-    ].sort();
+    ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
     if (resalableProductIds.length > 0) {
       await tx.$queryRaw`
         SELECT id FROM products
         WHERE id = ANY(${resalableProductIds}::uuid[])
-        ORDER BY id
+        ORDER BY id ASC
         FOR UPDATE`;
     }
 
@@ -817,6 +834,14 @@ export async function rejectSalesReturn(
   ctx: RequestContext,
 ): Promise<SalesReturnDetail> {
   return withTransaction(async (tx) => {
+    // Lock parent order first, then sales_return row (BR-CONC-01)
+    await tx.$queryRaw`
+      SELECT id FROM orders
+      WHERE id = (SELECT order_id FROM sales_returns WHERE id = ${id}::uuid)
+      FOR UPDATE`;
+    await tx.$queryRaw`
+      SELECT id FROM sales_returns WHERE id = ${id}::uuid FOR UPDATE`;
+
     const salesReturn = await tx.salesReturn.findUnique({
       where: { id },
       include: { order: { select: { orderNumber: true } } },

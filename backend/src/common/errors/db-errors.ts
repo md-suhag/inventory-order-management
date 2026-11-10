@@ -41,7 +41,9 @@ export function isUniqueViolation(err: unknown, field?: string): boolean {
   if (getPgCode(err) !== PgCode.UNIQUE_VIOLATION) return false;
   if (!field) return true;
   const target = (err as Prisma.PrismaClientKnownRequestError).meta?.target;
-  return Array.isArray(target) ? target.includes(field) : String(target ?? '').includes(field);
+  return Array.isArray(target)
+    ? target.some((t) => String(t).includes(field))
+    : String(target ?? '').includes(field);
 }
 
 /**

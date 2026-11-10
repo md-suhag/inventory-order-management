@@ -1,7 +1,7 @@
 import { Prisma, type PaymentStatus, type PurchaseStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { recordAudit, type RequestContext } from '../../common/audit/audit';
-import { withTransaction, type Tx } from '../../common/db/transaction';
+import { withIdempotentTransaction, withTransaction, type Tx } from '../../common/db/transaction';
 import { AppError, ErrorCode, businessRule, conflict, invalidReference, notFound } from '../../common/errors/app-error';
 import { buildListArgs, paginate, type Paginated } from '../../common/query/list-query';
 import { calculateDocumentTotals } from '../../common/pricing/document-calculator';
@@ -736,129 +736,148 @@ export async function cancelPurchase(id: string, ctx: RequestContext): Promise<P
   });
 }
 
+async function findReplayedReceipt(
+  db: Tx | typeof prisma,
+  id: string,
+  input: ReceiveGoodsInput,
+  idempotencyKey: string,
+): Promise<ReceiveGoodsResult | null> {
+  const existing = await db.purchaseReceipt.findUnique({
+    where: { idempotencyKey },
+    include: {
+      receivedBy: { select: publicUserSelect },
+      items: {
+        include: {
+          purchaseItem: { select: { productId: true, productName: true, productSku: true } },
+        },
+      },
+    },
+  });
+  if (!existing) return null;
+
+  if (existing.purchaseId !== id) {
+    throw new AppError(
+      422,
+      ErrorCode.IDEMPOTENCY_KEY_REUSED,
+      'Idempotency key was already used with a different request payload',
+    );
+  }
+
+  const sortedExisting = [...existing.items]
+    .map((i) => ({ purchaseItemId: i.purchaseItemId, quantity: i.quantity }))
+    .sort((a, b) => (a.purchaseItemId < b.purchaseItemId ? -1 : a.purchaseItemId > b.purchaseItemId ? 1 : 0));
+  const sortedInput = [...input.items].sort((a, b) =>
+    a.purchaseItemId < b.purchaseItemId ? -1 : a.purchaseItemId > b.purchaseItemId ? 1 : 0,
+  );
+
+  const isMatch =
+    sortedExisting.length === sortedInput.length &&
+    sortedExisting.every(
+      (ex, idx) =>
+        ex.purchaseItemId === sortedInput[idx]?.purchaseItemId && ex.quantity === sortedInput[idx]?.quantity,
+    );
+
+  if (!isMatch) {
+    throw new AppError(
+      422,
+      ErrorCode.IDEMPOTENCY_KEY_REUSED,
+      'Idempotency key was already used with a different request payload',
+    );
+  }
+
+  return {
+    replayed: true,
+    receipt: {
+      id: existing.id,
+      receiptNumber: existing.receiptNumber,
+      receivedAt: existing.receivedAt,
+      notes: existing.notes,
+      idempotencyKey: existing.idempotencyKey,
+      receivedBy: existing.receivedBy,
+      items: existing.items.map((it) => ({
+        id: it.id,
+        purchaseItemId: it.purchaseItemId,
+        productId: it.purchaseItem.productId,
+        productName: it.purchaseItem.productName,
+        productSku: it.purchaseItem.productSku,
+        quantity: it.quantity,
+        unitCost: it.unitCost.toFixed(4),
+      })),
+    },
+  };
+}
+
 export async function receiveGoods(
   id: string,
   input: ReceiveGoodsInput,
   ctx: RequestContext,
   idempotencyKey?: string,
 ): Promise<ReceiveGoodsResult> {
-  // 1. Idempotency replay check (BR-IDEM-01, BR-PUR-07)
-  if (idempotencyKey) {
-    const existing = await prisma.purchaseReceipt.findUnique({
-      where: { idempotencyKey },
-      include: {
-        receivedBy: { select: publicUserSelect },
-        items: {
-          include: {
-            purchaseItem: { select: { productId: true, productName: true, productSku: true } },
-          },
-        },
-      },
-    });
+  return withIdempotentTransaction(
+    async (tx) => {
+      // 1. Idempotency replay check (BR-IDEM-01, BR-PUR-07)
+      if (idempotencyKey) {
+        const replayed = await findReplayedReceipt(tx, id, input, idempotencyKey);
+        if (replayed) return replayed;
+      }
 
-    if (existing) {
-      if (existing.purchaseId !== id) {
-        throw new AppError(
-          422,
-          ErrorCode.IDEMPOTENCY_KEY_REUSED,
-          'Idempotency key was already used with a different request payload',
+      // 2. Lock purchase header first (BR-CONC-01)
+      const [purchase] = await tx.$queryRaw<{ id: string; status: PurchaseStatus }[]>`
+        SELECT id, status FROM purchases WHERE id = ${id}::uuid FOR UPDATE`;
+      if (!purchase) throw notFound('Purchase');
+
+      if (purchase.status !== 'ORDERED' && purchase.status !== 'PARTIALLY_RECEIVED') {
+        throw conflict(
+          `Goods can only be received for ORDERED or PARTIALLY_RECEIVED purchases (current: ${purchase.status})`,
+          ErrorCode.INVALID_STATE_TRANSITION,
         );
       }
 
-      // Check item quantities match
-      const existingItems = existing.items.map((i) => ({
-        purchaseItemId: i.purchaseItemId,
-        quantity: i.quantity,
-      }));
-      const sortedExisting = [...existingItems].sort((a, b) => a.purchaseItemId.localeCompare(b.purchaseItemId));
-      const sortedInput = [...input.items].sort((a, b) => a.purchaseItemId.localeCompare(b.purchaseItemId));
+      const purchaseItems = await tx.purchaseItem.findMany({
+        where: { purchaseId: id },
+      });
+      const itemMap = new Map(purchaseItems.map((pi) => [pi.id, pi]));
 
-      const isMatch =
-        sortedExisting.length === sortedInput.length &&
-        sortedExisting.every(
-          (ex, idx) =>
-            ex.purchaseItemId === sortedInput[idx]?.purchaseItemId && ex.quantity === sortedInput[idx]?.quantity,
-        );
-
-      if (!isMatch) {
-        throw new AppError(
-          422,
-          ErrorCode.IDEMPOTENCY_KEY_REUSED,
-          'Idempotency key was already used with a different request payload',
-        );
+      // Check receipt items validation
+      const receiptItemIds = input.items.map((it) => it.purchaseItemId);
+      if (new Set(receiptItemIds).size !== receiptItemIds.length) {
+        throw businessRule('Duplicate purchase item in receipt lines', [
+          { field: 'items', message: 'Each purchase item may only appear once in a receipt' },
+        ]);
       }
 
-      return {
-        replayed: true,
-        receipt: {
-          id: existing.id,
-          receiptNumber: existing.receiptNumber,
-          receivedAt: existing.receivedAt,
-          notes: existing.notes,
-          idempotencyKey: existing.idempotencyKey,
-          receivedBy: existing.receivedBy,
-          items: existing.items.map((it) => ({
-            id: it.id,
-            purchaseItemId: it.purchaseItemId,
-            productId: it.purchaseItem.productId,
-            productName: it.purchaseItem.productName,
-            productSku: it.purchaseItem.productSku,
-            quantity: it.quantity,
-            unitCost: it.unitCost.toFixed(4),
-          })),
-        },
-      };
-    }
-  }
-
-  // 2. Perform receipt in transaction
-  return withTransaction(async (tx) => {
-    // Lock purchase header first
-    const [purchase] = await tx.$queryRaw<{ id: string; status: PurchaseStatus }[]>`
-      SELECT id, status FROM purchases WHERE id = ${id}::uuid FOR UPDATE`;
-    if (!purchase) throw notFound('Purchase');
-
-    if (purchase.status !== 'ORDERED' && purchase.status !== 'PARTIALLY_RECEIVED') {
-      throw conflict(
-        `Goods can only be received for ORDERED or PARTIALLY_RECEIVED purchases (current: ${purchase.status})`,
-        ErrorCode.INVALID_STATE_TRANSITION,
-      );
-    }
-
-    const purchaseItems = await tx.purchaseItem.findMany({
-      where: { purchaseId: id },
-    });
-    const itemMap = new Map(purchaseItems.map((pi) => [pi.id, pi]));
-
-    // Check receipt items validation
-    const receiptItemIds = input.items.map((it) => it.purchaseItemId);
-    if (new Set(receiptItemIds).size !== receiptItemIds.length) {
-      throw businessRule('Duplicate purchase item in receipt lines', [
-        { field: 'items', message: 'Each purchase item may only appear once in a receipt' },
-      ]);
-    }
-
-    // Verify all items belong to this purchase and quantities are within bounds
-    for (const it of input.items) {
-      const pi = itemMap.get(it.purchaseItemId);
-      if (!pi) {
-        throw invalidReference('items', `Purchase item ${it.purchaseItemId} does not belong to this purchase`);
+      // Verify all items belong to this purchase and quantities are within bounds
+      for (const it of input.items) {
+        const pi = itemMap.get(it.purchaseItemId);
+        if (!pi) {
+          throw invalidReference('items', `Purchase item ${it.purchaseItemId} does not belong to this purchase`);
+        }
+        const remaining = pi.quantity - pi.receivedQuantity;
+        if (it.quantity > remaining) {
+          throw businessRule(
+            `Received quantity ${it.quantity} exceeds remaining quantity ${remaining} on line ${pi.lineNo}`,
+            [{ field: 'items', message: `Exceeds remaining quantity ${remaining}` }],
+          );
+        }
       }
-      const remaining = pi.quantity - pi.receivedQuantity;
-      if (it.quantity > remaining) {
-        throw businessRule(
-          `Received quantity ${it.quantity} exceeds remaining quantity ${remaining} on line ${pi.lineNo}`,
-          [{ field: 'items', message: `Exceeds remaining quantity ${remaining}` }],
-        );
-      }
-    }
 
-    // Sort items by productId ascending to ensure consistent lock order across products
-    const sortedInputs = [...input.items].sort((a, b) => {
-      const prodA = itemMap.get(a.purchaseItemId)!.productId;
-      const prodB = itemMap.get(b.purchaseItemId)!.productId;
-      return prodA.localeCompare(prodB);
-    });
+      // Lock products in deterministic ASCII id order matching PostgreSQL (BR-CONC-01)
+      const sortedProductIds = [
+        ...new Set(input.items.map((it) => itemMap.get(it.purchaseItemId)!.productId)),
+      ].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+      if (sortedProductIds.length > 0) {
+        await tx.$queryRaw`
+          SELECT id FROM products
+          WHERE id = ANY(${sortedProductIds}::uuid[])
+          ORDER BY id ASC
+          FOR UPDATE`;
+      }
+
+      const sortedInputs = [...input.items].sort((a, b) => {
+        const prodA = itemMap.get(a.purchaseItemId)!.productId;
+        const prodB = itemMap.get(b.purchaseItemId)!.productId;
+        return prodA < prodB ? -1 : prodA > prodB ? 1 : 0;
+      });
 
     const receiptNumber = await nextDocumentNumber(tx, 'PURCHASE_RECEIPT');
     const receipt = await tx.purchaseReceipt.create({
@@ -967,6 +986,11 @@ export async function receiveGoods(
         items: createdItems,
       },
     };
+  },
+  {
+    idempotencyKey,
+    onReplay: () =>
+      idempotencyKey ? findReplayedReceipt(prisma, id, input, idempotencyKey) : Promise.resolve(null),
   });
 }
 

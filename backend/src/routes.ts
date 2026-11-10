@@ -1,4 +1,6 @@
 import type { Router } from 'express';
+import { authenticate } from './common/middleware/authenticate';
+import { PERMISSIONS_METADATA, type PermissionProtectedHandler } from './common/middleware/authorize';
 import { authRouter } from './modules/auth/auth.routes';
 import { customersRouter } from './modules/customers/customers.routes';
 import { categoriesRouter } from './modules/categories/categories.routes';
@@ -40,14 +42,26 @@ export const apiModules: { path: string; router: Router }[] = [
   { path: '/settings', router: settingsRouter },
 ];
 
-interface RouteLayer {
-  route?: { path: string; methods: Record<string, boolean> };
+interface StackLayer {
+  handle?: unknown;
+  route?: {
+    path: string;
+    methods: Record<string, boolean>;
+    stack: { handle?: unknown }[];
+  };
+}
+
+export interface RouteSecurityInfo {
+  method: string;
+  path: string;
+  authenticated: boolean;
+  permissions: string[];
 }
 
 /** Flat list of registered routes, e.g. { method: 'post', path: '/api/v1/auth/login' }. */
 export function listRoutes(): { method: string; path: string }[] {
   return apiModules.flatMap(({ path, router }) =>
-    (router.stack as unknown as RouteLayer[])
+    (router.stack as unknown as StackLayer[])
       .filter((layer) => layer.route)
       .flatMap((layer) =>
         Object.keys(layer.route!.methods).map((method) => ({
@@ -56,4 +70,37 @@ export function listRoutes(): { method: string; path: string }[] {
         })),
       ),
   );
+}
+
+/** Enumerates every registered route along with router + route-level auth/RBAC middleware. */
+export function listRouteSecurity(): RouteSecurityInfo[] {
+  const results: RouteSecurityInfo[] = [];
+
+  for (const { path, router } of apiModules) {
+    let routerAuth = false;
+    const routerPermissions: string[] = [];
+
+    for (const layer of router.stack as unknown as StackLayer[]) {
+      if (!layer.route) {
+        if (layer.handle === authenticate) routerAuth = true;
+        const perms = (layer.handle as PermissionProtectedHandler | undefined)?.[PERMISSIONS_METADATA];
+        if (perms?.length) routerPermissions.push(...perms);
+        continue;
+      }
+
+      const routeHandles = layer.route.stack.map((s) => s.handle);
+      const authenticated = routerAuth || routeHandles.includes(authenticate);
+      const routePerms = routeHandles.flatMap(
+        (h) => (h as PermissionProtectedHandler | undefined)?.[PERMISSIONS_METADATA] ?? [],
+      );
+      const permissions = [...new Set([...routerPermissions, ...routePerms])];
+      const fullPath = `${API_PREFIX}${path}${layer.route.path === '/' ? '' : layer.route.path}`;
+
+      for (const method of Object.keys(layer.route.methods)) {
+        results.push({ method, path: fullPath, authenticated, permissions });
+      }
+    }
+  }
+
+  return results;
 }

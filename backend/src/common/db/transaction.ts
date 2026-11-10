@@ -1,11 +1,11 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { logger } from '../../config/logger';
-import { isRetryableTransactionError } from '../errors/db-errors';
+import { isRetryableTransactionError, isUniqueViolation } from '../errors/db-errors';
 
 export type Tx = Prisma.TransactionClient;
 
-interface TransactionOptions {
+export interface TransactionOptions {
   /** Attempts including the first one (deadlocks / serialization failures only). */
   maxAttempts?: number;
   timeoutMs?: number;
@@ -28,5 +28,29 @@ export async function withTransaction<T>(fn: (tx: Tx) => Promise<T>, options: Tr
       logger.warn({ attempt, delay }, 'retrying transaction after conflict');
       await new Promise((r) => setTimeout(r, delay));
     }
+  }
+}
+
+/**
+ * Runs an idempotent mutation inside `withTransaction`. If concurrent requests race on the unique
+ * `idempotency_key` constraint before seeing each other's uncommitted row, `onReplay` resolves the
+ * committed record cleanly instead of surfacing a duplicate error.
+ */
+export async function withIdempotentTransaction<T>(
+  fn: (tx: Tx) => Promise<T>,
+  options: TransactionOptions & {
+    idempotencyKey?: string;
+    onReplay?: () => Promise<T | null>;
+  } = {},
+): Promise<T> {
+  const { idempotencyKey, onReplay, ...txOptions } = options;
+  try {
+    return await withTransaction(fn, txOptions);
+  } catch (err) {
+    if (idempotencyKey && onReplay && isUniqueViolation(err, 'idempotency_key')) {
+      const replayed = await onReplay();
+      if (replayed) return replayed;
+    }
+    throw err;
   }
 }
