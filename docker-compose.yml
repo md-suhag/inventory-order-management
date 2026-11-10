@@ -1,7 +1,6 @@
-# Local development stack.
-#   docker compose up -d            -> PostgreSQL + Mailpit
-# Backend and frontend containers are added in the deployment phase; during
-# development they run on the host with `npm run dev`.
+# Local development stack:
+#   docker compose up -d                    -> PostgreSQL + Mailpit (run backend/frontend on host with npm run dev)
+#   docker compose --profile fullstack up   -> Full containerized stack (PostgreSQL + Mailpit + backend + frontend)
 name: inventory-oms
 
 services:
@@ -30,5 +29,69 @@ services:
       - '1025:1025' # SMTP
       - '8025:8025' # Web UI
 
+  migrate:
+    profiles: ['fullstack']
+    build:
+      context: ./backend
+      target: migrator
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://inventory:inventory@postgres:5432/inventory?schema=public
+      SEED_ADMIN_NAME: System Administrator
+      SEED_ADMIN_EMAIL: admin@example.com
+      SEED_ADMIN_PASSWORD: ChangeMe123!
+      BCRYPT_ROUNDS: 12
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  backend:
+    profiles: ['fullstack']
+    build:
+      context: ./backend
+      target: runner
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      LOG_LEVEL: info
+      DATABASE_URL: postgresql://inventory:inventory@postgres:5432/inventory?schema=public
+      CORS_ORIGINS: http://localhost:3000
+      APP_URL: http://localhost:3000
+      TRUST_PROXY: 0
+      JWT_ACCESS_SECRET: local-dev-only-jwt-secret-key-at-least-32-chars
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      SMTP_SECURE: 'false'
+      UPLOAD_DIR: /app/uploads
+      SWAGGER_ENABLED: 'true'
+    ports:
+      - '4000:4000'
+    volumes:
+      - uploads_dev:/app/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  frontend:
+    profiles: ['fullstack']
+    build:
+      context: ./frontend
+      target: runner
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      API_BASE_URL: http://backend:4000/api/v1
+      APP_URL: http://localhost:3000
+      SESSION_COOKIE_SECURE: 'false'
+    ports:
+      - '3000:3000'
+    depends_on:
+      backend:
+        condition: service_healthy
+
 volumes:
   pgdata:
+  uploads_dev:
