@@ -11,6 +11,7 @@ coverage/
 
 # generated
 backend/src/generated/
+next-env.d.ts
 
 # env & secrets
 .env
