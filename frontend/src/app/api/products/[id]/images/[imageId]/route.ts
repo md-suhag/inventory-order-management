@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/auth/cookies';
 import { clearSessionCookies, refreshTokenPair, setSessionCookies } from '@/lib/api/client';
 import { getServerEnv } from '@/lib/env';
+import { isValidUuid, safeImageContentType } from '@/lib/security';
 
 async function fetchImage(productId: string, imageId: string, accessToken: string | undefined): Promise<Response> {
   const { API_BASE_URL } = getServerEnv();
@@ -18,6 +19,9 @@ export async function GET(
   context: { params: Promise<{ id: string; imageId: string }> },
 ) {
   const { id, imageId } = await context.params;
+  if (!isValidUuid(id) || !isValidUuid(imageId)) {
+    return new NextResponse(null, { status: 400 });
+  }
   const store = await cookies();
   let accessToken = store.get(ACCESS_COOKIE)?.value;
   const refreshToken = store.get(REFRESH_COOKIE)?.value;
@@ -43,7 +47,7 @@ export async function GET(
   return new NextResponse(bytes, {
     status: 200,
     headers: {
-      'Content-Type': res.headers.get('Content-Type') ?? 'application/octet-stream',
+      'Content-Type': safeImageContentType(res.headers.get('Content-Type')),
       'X-Content-Type-Options': 'nosniff',
       'Cache-Control': 'private, max-age=3600',
     },

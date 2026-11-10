@@ -12,6 +12,7 @@ import {
   type ActionResult,
 } from '@/lib/api/client';
 import { REFRESH_COOKIE } from '@/lib/auth/cookies';
+import { sanitizeNextPath } from '@/lib/security';
 import {
   changePasswordFormSchema,
   forgotPasswordFormSchema,
@@ -20,11 +21,6 @@ import {
   resetPasswordFormSchema,
   updateProfileFormSchema,
 } from '@/lib/schemas';
-
-function sanitizeNextPath(next?: string | null): string {
-  if (!next || !next.startsWith('/') || next.startsWith('//')) return '/';
-  return next;
-}
 
 export async function loginAction(input: {
   email: string;

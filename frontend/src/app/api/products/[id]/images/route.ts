@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/auth/cookies';
 import { clearSessionCookies, refreshTokenPair, setSessionCookies } from '@/lib/api/client';
 import { getServerEnv } from '@/lib/env';
+import { isValidUuid } from '@/lib/security';
 
 async function forwardImageRequest(
   path: string,
@@ -23,6 +24,12 @@ async function forwardImageRequest(
 
 export async function POST(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
+  if (!isValidUuid(id)) {
+    return NextResponse.json(
+      { error: { code: 'BAD_REQUEST', message: 'Invalid product identifier' } },
+      { status: 400 },
+    );
+  }
   const store = await cookies();
   let accessToken = store.get(ACCESS_COOKIE)?.value;
   const refreshToken = store.get(REFRESH_COOKIE)?.value;
