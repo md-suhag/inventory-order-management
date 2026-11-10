@@ -1,8 +1,18 @@
+import { existsSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
+
+// Load .env if present so test configuration respects local overrides
+if (existsSync('.env') && typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile('.env');
+  } catch {
+    // Ignore if unreadable or absent
+  }
+}
 
 /** Integration tests run against a real PostgreSQL database (TECHNICAL_DECISIONS TD-21). */
 const TEST_DATABASE_URL =
-  process.env.DATABASE_URL_TEST ?? 'postgresql://inventory:inventory@localhost:5433/inventory_test?schema=public';
+  process.env.DATABASE_URL_TEST ?? 'postgresql://inventory:inventory@127.0.0.1:5433/inventory_test?schema=public';
 
 const testEnv = {
   NODE_ENV: 'test',

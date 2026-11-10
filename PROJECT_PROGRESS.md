@@ -1,6 +1,6 @@
 # Project Progress
 
-_Last updated: 2026-11-09_
+_Last updated: 2026-11-10_
 
 ## Phase status
 
@@ -11,7 +11,7 @@ _Last updated: 2026-11-09_
 | 2 · Backend foundation | ✅ Complete 2026-11-08 | Config, logging, errors, validation, query builder, auth, RBAC, health, Swagger, tests, CI |
 | 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
-| 5 · Orders & payments | ✅ Ready for review | Orders, invoices, payments, refunds, balances |
+| 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ⏳ | |
 | 7 · Frontend | ⏳ | |
 | 8 · Testing & hardening | ⏳ | |
@@ -42,13 +42,12 @@ _Last updated: 2026-11-09_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Owner review checkpoint for Phase 4 (`phase-4/purchase-inventory`).
-2. Merge `phase-4/purchase-inventory` into `main`.
-3. Create branch `phase-5/orders-payments` for Phase 5 (Orders & payments).
-4. Implement Orders module: draft CRUD, line snapshotting, order confirmation (stock deduction with row lock), cancellation (stock restoration), invoice generation.
-5. Implement Payments module: payments against orders, refunds, payment reversal, idempotency replay, balance updates.
-6. Integration tests, OpenAPI & API_DESIGN update, check lint + typecheck + tests.
-7. Owner review of Phase 5, merge to `main`.
+1. Create branch `phase-6/returns-reports-audit-settings` for Phase 6.
+2. Implement Sales returns: return authorization, return receipt (stock restoration), credit note, order refund link.
+3. Implement Reports module: inventory valuation, low stock, stock movement ledger, sales summary, payment summary.
+4. Implement Audit log read API and business settings management API.
+5. Integration tests, OpenAPI & API_DESIGN update, check lint + typecheck + tests.
+6. Owner review of Phase 6, merge to `main`.
 
 ## Phase 2 deliverables
 
@@ -76,8 +75,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–4 complete |
-| `phase-5/orders-payments` | Phase 5: Orders & payments complete (ready for merge) |
+| `main` | Phase 0–5 complete |
+| `phase-6/returns-reports-audit-settings` | Phase 6 (next) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
