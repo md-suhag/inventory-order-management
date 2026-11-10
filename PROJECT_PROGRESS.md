@@ -14,7 +14,7 @@ _Last updated: 2026-11-10_
 | 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ✅ Approved & merged 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
 | 7 · Frontend | ✅ Approved & merged 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
-| 8 · Testing & hardening | ⏳ | |
+| 8 · Testing & hardening | ✅ Complete (pending manual test run) 2026-11-10 | Critical concurrency/idempotency/rollback integration tests, payment/return/route-security unit tests, frontend Vitest + Testing Library suite, Playwright E2E workflow, backend lock/idempotency fixes, frontend security headers & CSV/open-redirect hardening |
 | 9 · Deployment preparation | ⏳ | |
 | 10 · Final review | ⏳ | |
 
@@ -42,9 +42,8 @@ _Last updated: 2026-11-10_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Create branch `phase-8/testing-hardening` from `main` for Phase 8: Testing & Hardening.
-2. Add frontend unit/component tests and Playwright E2E coverage across core business workflows, plus security & performance hardening.
-3. Update `PROJECT_PROGRESS.md` and prepare for owner review.
+1. Run backend test suite (`cd backend && npm test`), frontend unit/component suite (`cd frontend && npm test`), and Playwright E2E workflow (`cd frontend && npm run test:e2e`) on `phase-8/testing-hardening`.
+2. Fast-forward merge `phase-8/testing-hardening` into `main` once satisfied, then create `phase-9/deployment` for Phase 9: Deployment Preparation (Dockerfiles, production Compose, backup/restore & `DEPLOYMENT.md`).
 
 ## Phase 2 deliverables
 
@@ -73,7 +72,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 | Branch | Content |
 |--------|---------|
 | `main` | Phase 0–7 complete |
-| `phase-8/testing-hardening` | Phase 8 (next) |
+| `phase-8/testing-hardening` | Phase 8 complete (pending manual test run) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -88,10 +87,11 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 
 | Suite | Tests | Result |
 |-------|-------|--------|
-| Unit | 58 | ✅ |
-| Integration (PostgreSQL 16) | 157 | ✅ (Phase 1–6: 215 total across 26 files) |
+| Backend Unit (`tests/unit`) | 58 (Phases 2–6) + `payments-and-returns.test.ts` (Phase 8) | ✅ (Phase 2–6); Phase 8 added (awaiting manual run) |
+| Backend Integration (`tests/integration`, PostgreSQL 16) | 157 (Phases 2–6) + `critical-scenarios.test.ts` (Phase 8) | ✅ (Phase 2–6); Phase 8 added (awaiting manual run) |
+| Frontend Unit & Component (`frontend/tests/unit`, Vitest) | 4 files (`format`, `security-and-csv`, `permissions-and-cookies`, `components`) | Phase 8 added (awaiting manual run) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
-| E2E | – | Phase 8 |
+| E2E (`frontend/e2e/workflow.spec.ts`, Playwright) | Full workflow + auth redirect | Phase 8 added (awaiting manual run) |
 
 ## Documentation status
 
@@ -101,7 +101,7 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 | architecture/* (3) | ✅ updated with review decisions |
 | database/DATABASE_DESIGN.md, diagrams/* | ✅ |
 | api/API_DESIGN.md, api/openapi.yaml | ✅ auth/health/roles; extended per module |
-| security/SECURITY.md | ✅ Phase 2 controls |
-| testing/TESTING_STRATEGY.md | ✅ |
+| security/SECURITY.md | ✅ updated for Phases 7–8 controls |
+| testing/TESTING_STRATEGY.md | ✅ updated with Phase 8 critical scenarios, frontend Vitest & Playwright |
 | deployment/DEPLOYMENT.md | ⏳ Phase 9 |
 | README.md | ✅ setup; deployment section in Phase 9 |

@@ -16,36 +16,37 @@ Status legend: ✅ implemented & tested · 🟡 implemented, more tests in later
 | Enumeration resistance | ✅ | Unknown email / wrong password / locked → identical 401; dummy bcrypt compare equalises timing; forgot-password always 202 and does not await email delivery |
 | Password reset | ✅ | Single-use (conditional update), 30 min expiry, hashed at rest, newest link only, clears lockout, revokes sessions |
 | Self-registration | ✅ | Off by default; creates inactive STAFF accounts pending admin approval |
-| Token storage in browser | ⏳ Phase 7 | Next.js server keeps tokens in `HttpOnly; Secure; SameSite=Lax` cookies; never exposed to JS |
+| Token storage in browser | ✅ | Next.js BFF server keeps tokens in `HttpOnly; SameSite=Lax` cookies (`Secure` in production); never exposed to JS; `sanitizeNextPath` prevents open redirects |
 
 ## 2. Authorization
 
 | Control | Status | Implementation |
 |---------|:-:|----------------|
-| Central RBAC | ✅ | Permission catalogue in code (`common/auth/permissions.ts`), roles ↔ permissions in DB, `authorize(...)` middleware |
+| Central RBAC | ✅ | Permission catalogue in code (`common/auth/permissions.ts`), roles ↔ permissions in DB, `authorize(...)` middleware; `listRouteSecurity()` verified in unit tests (`NFR-SEC-04`) |
 | Backend enforcement | ✅ | Every protected route declares a permission; UI hiding is cosmetic |
-| ADMIN invariants | 🟡 | System ADMIN implicitly holds all permissions; last-active-admin protection lands with user management (Phase 3) |
-| Field-level restrictions | ⏳ Phase 3 | Cost prices/valuation hidden without `products.view_cost` |
+| ADMIN invariants | ✅ | System ADMIN implicitly holds all permissions; last-active-admin protection + self-demotion guard tested (`users.test.ts`) |
+| Field-level restrictions | ✅ | Cost prices/valuation hidden without `products.view_cost` across products, inventory, movements, and reports |
 
 ## 3. Input & output
 
 | Control | Status | Implementation |
 |---------|:-:|----------------|
-| Validation | ✅ | Zod on body/query/params; unknown keys stripped; bounded lengths; sort fields whitelisted |
+| Validation | ✅ | Zod on body/query/params; unknown keys stripped; bounded lengths; sort fields whitelisted; UUID checks on BFF image proxy routes |
 | SQL injection | ✅ | Prisma query builder; raw SQL only through tagged-template `$queryRaw` (parameterised) |
 | Sensitive fields | ✅ | Single `publicUserSelect` shape; tests assert hashes/counters never appear in responses |
-| Error responses | ✅ | Stable codes; no stack traces or SQL in responses (debug message only outside production) |
-| Uploads | ⏳ Phase 3 | Type by magic bytes, size limit, random names, outside web root, `nosniff` |
+| Error responses | ✅ | Stable codes; no stack traces or SQL in responses; frontend surfaces non-technical messages only |
+| CSV export safety | ✅ | `escapeCsvCell` neutralizes spreadsheet formula injection (`=`, `+`, `-`, `@`, `\t`, `\r`) on non-numeric strings |
+| Uploads | ✅ | Magic-byte validation (`detectImageType`), ≤ 2 MB (`LIMIT_FILE_SIZE` → 413), random names, stored outside web root, MIME allowlisted + `nosniff` |
 
 ## 4. Transport & headers
 
 | Control | Status | Implementation |
 |---------|:-:|----------------|
-| Security headers | ✅ | Helmet (CSP, HSTS, nosniff, frameguard, etc.); `x-powered-by` disabled |
+| Security headers | ✅ | Backend: Helmet (CSP, HSTS, nosniff, frameguard) + `x-powered-by` disabled; Frontend: `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, CSP `frame-ancestors 'none'; base-uri 'self'; form-action 'self'` |
 | CORS | ✅ | Explicit origin allow-list (`CORS_ORIGINS`); tested |
 | Body limits | ✅ | JSON 100 kB → 413 |
 | TLS | ⏳ Phase 9 | Terminated at the reverse proxy; `TRUST_PROXY` configures client IP detection |
-| CSRF | 🟡 | API uses bearer tokens (not CSRF-able); frontend cookie mutations via Server Actions with origin checks (Phase 7) |
+| CSRF | ✅ | API uses bearer tokens (not CSRF-able); frontend cookie mutations via Next.js Server Actions (built-in origin check) with `SameSite=Lax` cookies |
 
 ## 5. Data protection & integrity
 
