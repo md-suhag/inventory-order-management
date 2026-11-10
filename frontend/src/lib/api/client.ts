@@ -167,12 +167,20 @@ async function rawRequest(
     body = JSON.stringify(options.body);
   }
 
-  return fetch(url, {
-    method: options.method ?? 'GET',
-    headers,
-    body,
-    cache: 'no-store',
-  });
+  try {
+    return await fetch(url, {
+      method: options.method ?? 'GET',
+      headers,
+      body,
+      cache: 'no-store',
+    });
+  } catch {
+    throw new ApiRequestError(
+      503,
+      'API_UNAVAILABLE',
+      `Unable to reach the backend API (${API_BASE_URL}). Verify the backend server is running.`,
+    );
+  }
 }
 
 export async function apiFetchEnvelope<T>(
