@@ -12,7 +12,7 @@ _Last updated: 2026-11-10_
 | 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
 | 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
-| 6 · Returns, reports, audit, settings | ✅ Complete (pending review) 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
+| 6 · Returns, reports, audit, settings | ✅ Approved & merged 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
 | 7 · Frontend | ⏳ | |
 | 8 · Testing & hardening | ⏳ | |
 | 9 · Deployment preparation | ⏳ | |
@@ -42,8 +42,10 @@ _Last updated: 2026-11-10_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Owner review of Phase 6 on `phase-6/returns-reports-audit-settings` and fast-forward merge into `main`.
-2. Start Phase 7: Next.js 15 Frontend (BFF HttpOnly cookie auth, SSR data fetching, inventory, purchasing, orders, payments, returns, reports, audit logs, settings).
+1. Create branch `phase-7/frontend` from `main` for Phase 7.
+2. Scaffold Next.js 15 + React 19 + Tailwind 4 frontend (BFF HttpOnly cookie auth, native Server Components / Server Actions, no TanStack Query/SWR/global state).
+3. Implement UI modules: auth, dashboard, products/categories, suppliers/customers, purchases/inventory, orders/invoices/payments, sales returns, reports, audit logs, and settings.
+4. Add unit/component checks, update docs/progress, and prepare for owner review.
 
 ## Phase 2 deliverables
 
@@ -71,8 +73,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–5 complete |
-| `phase-6/returns-reports-audit-settings` | Phase 6 complete (ready for review) |
+| `main` | Phase 0–6 complete |
+| `phase-7/frontend` | Phase 7 (next) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
