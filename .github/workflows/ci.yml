@@ -47,6 +47,22 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+  docker:
+    name: Docker — compose config & image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configurations
+        run: |
+          docker compose config --quiet
+          docker compose --env-file .env.prod.example -f docker-compose.prod.yml config --quiet
+      - name: Build backend production and migrator images
+        run: |
+          docker build --target migrator -t inventory-backend-migrator:ci ./backend
+          docker build --target runner -t inventory-backend:ci ./backend
+      - name: Build frontend production image
+        run: docker build --target runner -t inventory-frontend:ci ./frontend
+
   frontend:
     name: Frontend — lint, typecheck, unit tests, build
     runs-on: ubuntu-latest
@@ -67,3 +83,19 @@ jobs:
       - run: npm run build
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
+
+  docker:
+    name: Docker — compose config & image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configurations
+        run: |
+          docker compose config --quiet
+          docker compose --env-file .env.prod.example -f docker-compose.prod.yml config --quiet
+      - name: Build backend production and migrator images
+        run: |
+          docker build --target migrator -t inventory-backend-migrator:ci ./backend
+          docker build --target runner -t inventory-backend:ci ./backend
+      - name: Build frontend production image
+        run: docker build --target runner -t inventory-frontend:ci ./frontend

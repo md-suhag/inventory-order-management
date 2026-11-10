@@ -2,7 +2,7 @@
 
 A portfolio-grade inventory and order management system for a small/medium business: purchasing and goods receipts, an append-only stock ledger, customer orders with invoices, payments and refunds, sales returns, reports, RBAC and audit logs — built with a focus on data integrity under concurrency.
 
-> **Status:** Phase 7 (Frontend) complete — ready for Phase 8 (Testing & Hardening). See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
+> **Status:** Phase 9 (Deployment Preparation) complete — ready for review before Phase 10 (Final Review). See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
 
 > **Contributors and AI agents:** read [AGENTS.md](AGENTS.md) first — working rules, owner decisions, conventions and setup. The original brief is in [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
 
@@ -12,8 +12,8 @@ A portfolio-grade inventory and order management system for a small/medium busin
 |-------|-----------|
 | Backend | Node.js 22, Express 5, TypeScript 5.9, Prisma 6, PostgreSQL 16, Zod 4, bcrypt, pino |
 | Frontend | Next.js 16 (`16.4.6`, App Router BFF, Server Components/Actions), React 19, Tailwind CSS 4, shadcn/ui |
-| Testing | Vitest, Supertest (real PostgreSQL), Playwright *(Phase 8)* |
-| Tooling | Docker Compose, GitHub Actions, OpenAPI 3 + Swagger UI |
+| Testing | Vitest 4, Supertest (real PostgreSQL), Testing Library, Playwright |
+| Tooling | Docker / Multi-stage Dockerfiles, Docker Compose, GitHub Actions, OpenAPI 3 + Swagger UI |
 
 ## Quick start (local development)
 
@@ -62,13 +62,35 @@ curl -s -X POST localhost:4000/api/v1/auth/login \
 | `npm run db:deploy` | Apply migrations (CI / production) |
 | `npm run db:seed` | Idempotent base seed + initial admin |
 
+## Frontend scripts
+
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Start Next.js dev server (`http://localhost:3000`) |
+| `npm run build` / `npm start` | Production build / start Next.js server |
+| `npm test` | Run Vitest unit & component tests |
+| `npm run test:e2e` | Run Playwright end-to-end suite (requires running backend & frontend) |
+| `npm run lint` / `npm run typecheck` | ESLint / tsc |
+
+## Production deployment
+
+See [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) for environment setup, reverse proxy / TLS configuration, least-privilege database role hardening (`scripts/db/harden-app-role.sql`), and backup/restore scripts (`scripts/backup/`).
+
+```bash
+cp .env.prod.example .env.prod    # fill real secrets & domain URLs
+docker compose --env-file .env.prod -f docker-compose.prod.yml up -d --build
+```
+
 ## Repository layout
 
 ```
-backend/            Express API — src/{config,common,modules,database}, prisma/, tests/
-docs/               requirements, architecture, database, api, security, testing, diagrams (ERD)
-scripts/erd/        ERD generator (schema.prisma → docs/diagrams/ERD.drawio)
-docker-compose.yml  local PostgreSQL + Mailpit
+backend/                 Express API + Dockerfile — src/{config,common,modules,database}, prisma/, tests/
+frontend/                Next.js BFF + Dockerfile — src/{app,components,lib}, tests/, e2e/
+scripts/                 erd/ (schema → ERD.drawio), db/ (harden-app-role.sql), backup/ (backup.sh, restore.sh)
+docs/                    requirements, architecture, database, api, security, testing, deployment, diagrams (ERD)
+docker-compose.yml       local PostgreSQL + Mailpit (+ optional `fullstack` profile)
+docker-compose.prod.yml  production PostgreSQL, migrate, backend, frontend stack
+.env.prod.example        production environment template
 ```
 
 ## Documentation
@@ -82,5 +104,6 @@ docker-compose.yml  local PostgreSQL + Mailpit
 | API | [Design & conventions](docs/api/API_DESIGN.md) · [OpenAPI](docs/api/openapi.yaml) |
 | Security | [docs/security/SECURITY.md](docs/security/SECURITY.md) |
 | Testing | [docs/testing/TESTING_STRATEGY.md](docs/testing/TESTING_STRATEGY.md) |
+| Deployment | [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) |
 
 ![Database overview](docs/diagrams/ERD.png)

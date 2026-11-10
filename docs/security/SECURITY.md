@@ -45,7 +45,7 @@ Status legend: ✅ implemented & tested · 🟡 implemented, more tests in later
 | Security headers | ✅ | Backend: Helmet (CSP, HSTS, nosniff, frameguard) + `x-powered-by` disabled; Frontend: `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, CSP `frame-ancestors 'none'; base-uri 'self'; form-action 'self'` |
 | CORS | ✅ | Explicit origin allow-list (`CORS_ORIGINS`); tested |
 | Body limits | ✅ | JSON 100 kB → 413 |
-| TLS | ⏳ Phase 9 | Terminated at the reverse proxy; `TRUST_PROXY` configures client IP detection |
+| TLS | ✅ | Terminated at reverse proxy (Caddy/Nginx in `docs/deployment/DEPLOYMENT.md`); `TRUST_PROXY=1`, `SESSION_COOKIE_SECURE=true` |
 | CSRF | ✅ | API uses bearer tokens (not CSRF-able); frontend cookie mutations via Next.js Server Actions (built-in origin check) with `SameSite=Lax` cookies |
 
 ## 5. Data protection & integrity
@@ -55,7 +55,7 @@ Status legend: ✅ implemented & tested · 🟡 implemented, more tests in later
 | Append-only ledgers | ✅ | DB triggers block UPDATE/DELETE on `inventory_movements`, `payments`, `audit_logs`, `purchase_receipts(_items)`; tested |
 | Integrity constraints | ✅ | 58 CHECK constraints (non-negative stock, totals formula, payment links…) |
 | Audit trail | ✅ | Auth events now; business events per module, written in the same transaction |
-| Least-privilege DB role | ⏳ Phase 9 | Production app user should not own the schema; `REVOKE UPDATE, DELETE` on ledger tables as a second layer |
+| Least-privilege DB role | ✅ | `scripts/db/harden-app-role.sql` creates non-owner `inventory_app` and revokes `UPDATE`/`DELETE` on ledger tables & `_prisma_migrations` |
 
 ## 6. Secrets & configuration
 
