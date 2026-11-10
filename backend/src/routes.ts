@@ -9,6 +9,10 @@ import { purchasesRouter } from './modules/purchases/purchases.routes';
 import { inventoryRouter } from './modules/inventory/inventory.routes';
 import { ordersRouter } from './modules/orders/orders.routes';
 import { paymentsRouter } from './modules/payments/payments.routes';
+import { salesReturnsRouter } from './modules/sales-returns/sales-returns.routes';
+import { reportsRouter } from './modules/reports/reports.routes';
+import { auditLogsRouter } from './modules/audit-logs/audit-logs.routes';
+import { settingsRouter } from './modules/settings/settings.routes';
 import { rolesRouter } from './modules/roles/roles.routes';
 import { suppliersRouter } from './modules/suppliers/suppliers.routes';
 import { usersRouter } from './modules/users/users.routes';
@@ -30,6 +34,10 @@ export const apiModules: { path: string; router: Router }[] = [
   { path: '/inventory', router: inventoryRouter },
   { path: '/orders', router: ordersRouter },
   { path: '/payments', router: paymentsRouter },
+  { path: '/sales-returns', router: salesReturnsRouter },
+  { path: '/reports', router: reportsRouter },
+  { path: '/audit-logs', router: auditLogsRouter },
+  { path: '/settings', router: settingsRouter },
 ];
 
 interface RouteLayer {
