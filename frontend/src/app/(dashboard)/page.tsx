@@ -38,8 +38,8 @@ export default async function DashboardPage({
       <>
         <PageHeader title="Dashboard" description="Welcome to Inventory & Order Management." />
         <AccessDenied
-          title="Dashboard Not Permitted"
-          description="Your role does not include dashboard.read. Use the sidebar to open modules assigned to your role."
+          title="Dashboard Not Available"
+          description="Your role does not have access to the dashboard summary. Use the navigation menu to open available sections."
         />
       </>
     );

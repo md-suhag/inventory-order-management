@@ -193,7 +193,7 @@ export function ProductDetailClient({
               {product.stockQuantity} {product.unit}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              Stock changes only via movements (BR-INV-01)
+              Stock updates via inventory movements only
             </p>
           </CardContent>
         </Card>

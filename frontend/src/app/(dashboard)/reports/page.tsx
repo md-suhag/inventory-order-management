@@ -116,7 +116,7 @@ export default async function ReportsPage({
     <>
       <PageHeader
         title="Reports & Analytics"
-        description="Authoritative SQL-aggregated operational, valuation, and financial reports with CSV export."
+        description="Operational, inventory valuation, and financial reports with CSV export."
       />
       <ReportsControls
         key={`${activeTab}-${activeRangeFrom}-${activeRangeTo}-${activeAsOf}`}

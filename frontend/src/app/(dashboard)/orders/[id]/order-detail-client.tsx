@@ -677,7 +677,7 @@ export function OrderDetailClient({
             ? 'Validates availability and atomically deducts stock for every line item, generating an invoice number.'
             : confirmState === 'cancel'
               ? order.status === 'CONFIRMED'
-                ? 'Cancelling a confirmed order restores deducted stock with SALE_CANCELLATION movements.'
+                ? 'Cancelling a confirmed order restores deducted stock back to inventory.'
                 : 'Cancels this draft order.'
               : confirmState === 'deliver'
                 ? 'Transitions shipment to DELIVERED status (eligible for returns).'
@@ -697,7 +697,7 @@ export function OrderDetailClient({
         open={Boolean(reverseTargetId)}
         onOpenChange={(open) => !open && setReverseTargetId(null)}
         title="Reverse Payment Record?"
-        description="Creates an immutable REVERSAL row and adjusts order balance. This cannot be undone."
+        description="Reverses this payment record and updates the order balance. This cannot be undone."
         confirmLabel="Reverse Record"
         reasonMode="required"
         reasonLabel="Reversal Reason"

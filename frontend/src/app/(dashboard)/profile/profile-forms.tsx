@@ -235,7 +235,7 @@ export function ProfileForms({
         open={logoutAllOpen}
         onOpenChange={setLogoutAllOpen}
         title="Log out of all sessions?"
-        description="This immediately revokes all refresh tokens and invalidates access tokens on every device, including this one."
+        description="This immediately signs you out on every browser and device, including this one."
         confirmLabel="Log out everywhere"
         loading={loggingOutAll}
         onConfirm={handleLogoutAll}

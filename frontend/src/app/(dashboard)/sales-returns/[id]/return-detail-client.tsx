@@ -414,7 +414,7 @@ export function ReturnDetailClient({
         }
         description={
           actionMode === 'complete'
-            ? 'Restocks RESALABLE lines via SALE_RETURN movements and updates the order returned credit.'
+            ? 'Restocks resalable items back to inventory and updates the order return credit.'
             : 'Rejects this return request with a mandatory reason.'
         }
         confirmLabel={actionMode === 'complete' ? 'Complete Return' : 'Reject Return'}

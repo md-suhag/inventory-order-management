@@ -174,11 +174,12 @@ async function rawRequest(
       body,
       cache: 'no-store',
     });
-  } catch {
+  } catch (err) {
+    console.error('[bff-api] Request failed:', url, err);
     throw new ApiRequestError(
       503,
       'API_UNAVAILABLE',
-      `Unable to reach the backend API (${API_BASE_URL}). Verify the backend server is running.`,
+      'Service is temporarily unavailable. Please try again in a moment.',
     );
   }
 }

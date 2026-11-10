@@ -188,7 +188,7 @@ export function PurchaseEditor({
         <CardHeader>
           <CardTitle>{existing ? `Edit ${existing.purchaseNumber}` : 'Purchase Details'}</CardTitle>
           <CardDescription>
-            Draft purchases do not affect stock. Totals are recalculated authoritatively on the server.
+            Draft purchases do not affect stock. Final totals are confirmed upon saving.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

@@ -240,8 +240,7 @@ export function ProductsClient({
           <DialogHeader>
             <DialogTitle>New Product</DialogTitle>
             <DialogDescription>
-              SKU is automatically trimmed and uppercased. Optional opening stock creates an OPENING_STOCK
-              movement.
+              SKU is automatically uppercased. Optional opening stock records an initial stock entry.
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleCreate} className="space-y-4">

@@ -257,8 +257,8 @@ export function InventoryClient({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="IN">Increase (ADJUSTMENT_IN)</SelectItem>
-                    <SelectItem value="OUT">Decrease (ADJUSTMENT_OUT)</SelectItem>
+                    <SelectItem value="IN">Increase Stock (+)</SelectItem>
+                    <SelectItem value="OUT">Decrease Stock (-)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -227,7 +227,7 @@ export function PaymentsClient({
         open={Boolean(reverseTarget)}
         onOpenChange={(open) => !open && setReverseTarget(null)}
         title={`Reverse ${reverseTarget?.paymentNumber}?`}
-        description="Creates a compensating REVERSAL entry and recalculates the linked document balance."
+        description="Records a reversal entry and updates the linked document balance. This cannot be undone."
         confirmLabel="Reverse Payment"
         reasonMode="required"
         reasonLabel="Reversal Reason"

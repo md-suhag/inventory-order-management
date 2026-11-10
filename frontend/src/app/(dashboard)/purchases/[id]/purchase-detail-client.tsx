@@ -341,7 +341,7 @@ export function PurchaseDetailClient({
           <DialogHeader>
             <DialogTitle>Receive Goods — {purchase.purchaseNumber}</DialogTitle>
             <DialogDescription>
-              Specify quantities received now (supports partial receiving). Idempotency-Key attached.
+              Specify quantities received now (partial or full receiving).
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleReceiveSubmit} className="space-y-4">

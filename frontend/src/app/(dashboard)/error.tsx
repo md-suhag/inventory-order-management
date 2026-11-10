@@ -5,7 +5,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 export default function DashboardError({
-  error,
+  error: _error,
   reset,
 }: {
   error: Error & { digest?: string };
@@ -18,7 +18,7 @@ export default function DashboardError({
       </div>
       <h2 className="text-lg font-semibold">Something went wrong</h2>
       <p className="mt-1 max-w-md text-sm text-muted-foreground">
-        {error.message || 'Unable to load this view right now.'}
+        Unable to load this page right now. Please try again in a moment.
       </p>
       <div className="mt-4 flex items-center gap-2">
         <Button variant="outline" onClick={reset}>
