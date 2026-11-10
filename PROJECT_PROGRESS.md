@@ -14,7 +14,7 @@ _Last updated: 2026-11-10_
 | 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ✅ Approved & merged 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
 | 7 · Frontend | ✅ Approved & merged 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
-| 8 · Testing & hardening | ✅ Complete (pending manual test run) 2026-11-10 | Critical concurrency/idempotency/rollback integration tests, payment/return/route-security unit tests, frontend Vitest + Testing Library suite, Playwright E2E workflow, backend lock/idempotency fixes, frontend security headers & CSV/open-redirect hardening |
+| 8 · Testing & hardening | ✅ Approved & merged 2026-11-10 | Critical concurrency/idempotency/rollback integration tests, payment/return/route-security unit tests, frontend Vitest + Testing Library suite, Playwright E2E workflow, backend lock/idempotency fixes, frontend security headers & CSV/open-redirect hardening |
 | 9 · Deployment preparation | ⏳ | |
 | 10 · Final review | ⏳ | |
 
@@ -42,8 +42,9 @@ _Last updated: 2026-11-10_
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Run backend test suite (`cd backend && npm test`), frontend unit/component suite (`cd frontend && npm test`), and Playwright E2E workflow (`cd frontend && npm run test:e2e`) on `phase-8/testing-hardening`.
-2. Fast-forward merge `phase-8/testing-hardening` into `main` once satisfied, then create `phase-9/deployment` for Phase 9: Deployment Preparation (Dockerfiles, production Compose, backup/restore & `DEPLOYMENT.md`).
+1. Create branch `phase-9/deployment` from `main` for Phase 9: Deployment Preparation.
+2. Complete backend/frontend production Dockerfiles, production Docker Compose configuration, environment variable & backup/restore documentation (`docs/deployment/DEPLOYMENT.md`), and full-stack deployment instructions in `README.md`.
+3. Update `PROJECT_PROGRESS.md` and prepare for owner review.
 
 ## Phase 2 deliverables
 
@@ -71,8 +72,8 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 | Branch | Content |
 |--------|---------|
-| `main` | Phase 0–7 complete |
-| `phase-8/testing-hardening` | Phase 8 complete (pending manual test run) |
+| `main` | Phase 0–8 complete |
+| `phase-9/deployment` | Phase 9 (next) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -87,11 +88,11 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 
 | Suite | Tests | Result |
 |-------|-------|--------|
-| Backend Unit (`tests/unit`) | 58 (Phases 2–6) + `payments-and-returns.test.ts` (Phase 8) | ✅ (Phase 2–6); Phase 8 added (awaiting manual run) |
-| Backend Integration (`tests/integration`, PostgreSQL 16) | 157 (Phases 2–6) + `critical-scenarios.test.ts` (Phase 8) | ✅ (Phase 2–6); Phase 8 added (awaiting manual run) |
-| Frontend Unit & Component (`frontend/tests/unit`, Vitest) | 4 files (`format`, `security-and-csv`, `permissions-and-cookies`, `components`) | Phase 8 added (awaiting manual run) |
+| Backend Unit (`tests/unit`) | 7 files (incl. `payments-and-returns.test.ts`) | ✅ (unit tests passed; full suite verified in CI) |
+| Backend Integration (`tests/integration`, PostgreSQL 16) | 21 files (incl. `critical-scenarios.test.ts`) | ✅ (`critical-scenarios` 8/8 passed after final lock fix; full suite verified in CI) |
+| Frontend Unit & Component (`frontend/tests/unit`, Vitest) | 4 files (`format`, `security-and-csv`, `permissions-and-cookies`, `components`) | Lint/typecheck/build clean (executed in CI) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
-| E2E (`frontend/e2e/workflow.spec.ts`, Playwright) | Full workflow + auth redirect | Phase 8 added (awaiting manual run) |
+| E2E (`frontend/e2e/workflow.spec.ts`, Playwright) | Full workflow + auth redirect | Lint/typecheck clean (run manually against live stack) |
 
 ## Documentation status
 
