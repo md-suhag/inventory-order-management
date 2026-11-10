@@ -13,7 +13,7 @@ _Last updated: 2026-11-10_
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
 | 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
 | 6 · Returns, reports, audit, settings | ✅ Approved & merged 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
-| 7 · Frontend | ⏳ | |
+| 7 · Frontend | ✅ Complete 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
 | 8 · Testing & hardening | ⏳ | |
 | 9 · Deployment preparation | ⏳ | |
 | 10 · Final review | ⏳ | |
@@ -22,30 +22,28 @@ _Last updated: 2026-11-10_
 
 | Module | DB design | Backend | Frontend | Tests |
 |--------|:-:|:-:|:-:|:-:|
-| Auth & accounts | ✅ | ✅ | – | ✅ |
-| Users & RBAC | ✅ | ✅ user admin API (last-admin guard, BR-USER-02..07), role CRUD + permission editing | – | ✅ |
-| Dashboard | ✅ | ✅ summary: counts, orders by status, low/out of stock, recent orders/purchases, inventory value + outstanding balances | – | ✅ |
-| Products | ✅ | ✅ CRUD, opening stock via inventory service, stock-state filters, cost visibility, images | – | ✅ |
-| Categories | ✅ | ✅ CRUD, archive/unarchive, delete only when unused | – | ✅ |
-| Suppliers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
-| Customers | ✅ | ✅ CRUD, archive, safe delete, balance summary | – | ✅ |
-| Purchases & receiving | ✅ | ✅ CRUD, confirm (`DRAFT` → `ORDERED`), cancel, atomic goods receipt with WAC blending, idempotency replay, receipt listing | – | ✅ |
-| Inventory | ✅ | ✅ overview with stock state & cost privacy gating, low-stock query, manual adjustments (`ADJUSTMENT_IN`/`OUT`), movement history & details | – | ✅ |
-| Orders & invoices | ✅ | ✅ CRUD, calculations, confirmation (stock deduction), cancellation, shipping, delivery, completion, printable invoice | – | ✅ |
-| Payments | ✅ | ✅ ledger, payments on orders, refunds, reversals, idempotency replay, balance updates | – | ✅ |
-| Sales returns | ✅ | ✅ requests against delivered/completed orders, qty validation, RESALABLE restock (`SALE_RETURN`), return-linked refunds (`salesReturnId`), rejection | – | ✅ |
-| Reports | ✅ | ✅ sales (summary, by product w/ cost gating, by customer), purchases, inventory (summary, WAC valuation), financial (summary, AR/AP aging) | – | ✅ |
-| Audit logs | ✅ | ✅ paginated search/filter (`actorId`, `action`, `entityType`, `entityId`, date range), detail endpoint, immutable ledger | – | ✅ |
-| Business settings | ✅ | ✅ singleton `GET`/`PATCH`/`PUT`, currency lock after transactions, sequence prefix/padding, payment method config | – | ✅ |
+| Auth & accounts | ✅ | ✅ | ✅ login, register, forgot/reset password, profile, change password, logout-all | ✅ |
+| Users & RBAC | ✅ | ✅ user admin API (last-admin guard, BR-USER-02..07), role CRUD + permission editing | ✅ user CRUD/activation, role CRUD + module permission matrix | ✅ |
+| Dashboard | ✅ | ✅ summary: counts, orders by status, low/out of stock, recent orders/purchases, inventory value + outstanding balances | ✅ operational & financial KPIs, sales chart, low-stock & recent activity | ✅ |
+| Products | ✅ | ✅ CRUD, opening stock via inventory service, stock-state filters, cost visibility, images | ✅ list/filters, create/edit, cost gating, image upload/reorder/delete via BFF | ✅ |
+| Categories | ✅ | ✅ CRUD, archive/unarchive, delete only when unused | ✅ list/search/sort, create/edit, archive/unarchive/delete | ✅ |
+| Suppliers | ✅ | ✅ CRUD, archive, safe delete, balance summary | ✅ list/search, detail w/ balance summary & purchase history, archive/delete | ✅ |
+| Customers | ✅ | ✅ CRUD, archive, safe delete, balance summary | ✅ list/search, detail w/ balance summary & order history, archive/delete | ✅ |
+| Purchases & receiving | ✅ | ✅ CRUD, confirm (`DRAFT` → `ORDERED`), cancel, atomic goods receipt with WAC blending, idempotency replay, receipt listing | ✅ list/filters, draft editor, confirm/cancel, partial/full GRN receiving w/ idempotency | ✅ |
+| Inventory | ✅ | ✅ overview with stock state & cost privacy gating, low-stock query, manual adjustments (`ADJUSTMENT_IN`/`OUT`), movement history & details | ✅ overview/low-stock banner, manual adjustments w/ idempotency, movement ledger & detail | ✅ |
+| Orders & invoices | ✅ | ✅ CRUD, calculations, confirmation (stock deduction), cancellation, shipping, delivery, completion, printable invoice | ✅ list/filters, draft editor (walk-in + discounts), lifecycle actions, printable invoice | ✅ |
+| Payments | ✅ | ✅ ledger, payments on orders, refunds, reversals, idempotency replay, balance updates | ✅ global ledger, order payment/refund modals, reversals w/ reason + idempotency | ✅ |
+| Sales returns | ✅ | ✅ requests against delivered/completed orders, qty validation, RESALABLE restock (`SALE_RETURN`), return-linked refunds (`salesReturnId`), rejection | ✅ list, new return qty calculator, complete/reject, linked refund modal | ✅ |
+| Reports | ✅ | ✅ sales (summary, by product w/ cost gating, by customer), purchases, inventory (summary, WAC valuation), financial (summary, AR/AP aging) | ✅ tabbed analytics, charts, AR/AP aging, CSV export on all tables | ✅ |
+| Audit logs | ✅ | ✅ paginated search/filter (`actorId`, `action`, `entityType`, `entityId`, date range), detail endpoint, immutable ledger | ✅ searchable/filterable ledger + JSON metadata inspector | ✅ |
+| Business settings | ✅ | ✅ singleton `GET`/`PATCH`/`PUT`, currency lock after transactions, sequence prefix/padding, payment method config | ✅ profile, localization, tax/alerts, document sequences, payment methods | ✅ |
 
 ## Next steps (handoff — start here)
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Create branch `phase-7/frontend` from `main` for Phase 7.
-2. Scaffold Next.js 15 + React 19 + Tailwind 4 frontend (BFF HttpOnly cookie auth, native Server Components / Server Actions, no TanStack Query/SWR/global state).
-3. Implement UI modules: auth, dashboard, products/categories, suppliers/customers, purchases/inventory, orders/invoices/payments, sales returns, reports, audit logs, and settings.
-4. Add unit/component checks, update docs/progress, and prepare for owner review.
+1. Review Phase 7 frontend (`phase-7/frontend` branch) and run manual/E2E verification.
+2. Proceed to Phase 8: Testing & Hardening (unit/component checks, Playwright E2E workflows, security & performance review).
 
 ## Phase 2 deliverables
 
@@ -63,7 +61,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
 ## Key technical decisions (full list: docs/architecture/TECHNICAL_DECISIONS.md)
 
-- Stable-version policy (TS 5.9, Prisma 6.19, Next.js 15, Vitest 4, PostgreSQL 16); security fixes override it (nodemailer 10).
+- Stable-version policy (TS 5.9, Prisma 6.19, Next.js 16.4.6 [upgraded from 15.5.29 for security audit], Vitest 4, PostgreSQL 16); security fixes override it (nodemailer 10, Next.js 16.4.6).
 - Modular monolith; the Next.js server is the API client and keeps tokens in HttpOnly cookies (BFF); Next.js native fetching, no TanStack Query.
 - bcrypt password hashing; hand-written OpenAPI with a route-coverage test.
 - Stock deducted at order confirmation with row locks + DB CHECK backstop; append-only ledgers enforced by triggers.
@@ -74,7 +72,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 | Branch | Content |
 |--------|---------|
 | `main` | Phase 0–6 complete |
-| `phase-7/frontend` | Phase 7 (next) |
+| `phase-7/frontend` | Phase 7 complete (ready for review) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 

@@ -2,7 +2,7 @@
 
 A portfolio-grade inventory and order management system for a small/medium business: purchasing and goods receipts, an append-only stock ledger, customer orders with invoices, payments and refunds, sales returns, reports, RBAC and audit logs — built with a focus on data integrity under concurrency.
 
-> **Status:** Phase 2 (backend foundation, authentication, RBAC) complete. See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
+> **Status:** Phase 7 (Frontend) complete — ready for Phase 8 (Testing & Hardening). See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
 
 > **Contributors and AI agents:** read [AGENTS.md](AGENTS.md) first — working rules, owner decisions, conventions and setup. The original brief is in [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
 
@@ -11,7 +11,7 @@ A portfolio-grade inventory and order management system for a small/medium busin
 | Layer | Technology |
 |-------|-----------|
 | Backend | Node.js 22, Express 5, TypeScript 5.9, Prisma 6, PostgreSQL 16, Zod 4, bcrypt, pino |
-| Frontend | Next.js 15 (App Router, Server Components/Actions), React 19, Tailwind CSS 4, shadcn/ui *(Phase 7)* |
+| Frontend | Next.js 16 (`16.4.6`, App Router BFF, Server Components/Actions), React 19, Tailwind CSS 4, shadcn/ui |
 | Testing | Vitest, Supertest (real PostgreSQL), Playwright *(Phase 8)* |
 | Tooling | Docker Compose, GitHub Actions, OpenAPI 3 + Swagger UI |
 
@@ -30,6 +30,12 @@ npm install
 npx prisma migrate deploy     # apply migrations
 npm run db:seed               # permissions, roles, settings, payment methods, initial admin
 npm run dev                   # http://localhost:4000
+
+# 3. Frontend (in a separate terminal)
+cd frontend
+cp .env.example .env.local    # API_BASE_URL=http://localhost:4000/api/v1
+npm ci
+npm run dev                   # http://localhost:3000
 ```
 
 - API docs (Swagger UI): http://localhost:4000/api/docs

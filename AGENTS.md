@@ -29,7 +29,7 @@ Mini Inventory & Order Management System — a portfolio-grade, single-business 
 
 ## 4. Owner decisions (Phase 1 review, 2026-11-08)
 
-- **Stable versions, not newest:** prefer the long-established major; skip a major younger than ~12 months. Security advisories override this. Current: Node 22, TypeScript 5.9, Express 5, Prisma 6.19, Zod 4, Vitest 4, pino 9, ESLint 9, PostgreSQL 16, Next.js 15, React 19, Tailwind 4. Check `npm view <pkg> time` before adding a dependency; avoid unnecessary dependencies.
+- **Stable versions, not newest:** prefer the long-established major; skip a major younger than ~12 months. Security advisories override this. Current: Node 22, TypeScript 5.9, Express 5, Prisma 6.19, Zod 4, Vitest 4, pino 9, ESLint 9, PostgreSQL 16, Next.js 16 (`>= 16.4.6`, upgraded from 15.5.29 because Next 15 bundles vulnerable `postcss <= 8.5.22` flagged by `npm audit`), React 19, Tailwind 4. Check `npm view <pkg> time` before adding a dependency; avoid unnecessary dependencies.
 - **Password hashing: bcrypt.**
 - **Frontend: Next.js native fetching** (Server Components, Server Actions, URL search params, React state). **No TanStack Query / SWR / global state libraries.** The Next.js server holds tokens in HttpOnly cookies (TD-06).
 - **OpenAPI is hand-written** (`docs/api/openapi.yaml`); an integration test fails on undocumented or non-existent routes.

@@ -2,7 +2,7 @@
 
 Format: decision → alternatives considered → rationale. All decisions are **Accepted** (Phase 1 review, 2026-11-08).
 
-**Version policy (review decision):** use the long-established stable major of each dependency, not the newest. A major that is less than ~12 months old is skipped in favour of the previous one; security advisories override this (a patched version is always preferred). Chosen: Node 22 LTS, TypeScript 5.9, Express 5, Prisma 6.19, Zod 4, Vitest 4, pino 9, ESLint 9, Next.js 15, React 19, Tailwind CSS 4, PostgreSQL 16. Exception: nodemailer 10.x (all earlier majors have open high-severity advisories).
+**Version policy (review decision):** use the long-established stable major of each dependency, not the newest. A major that is less than ~12 months old is skipped in favour of the previous one; security advisories override this (a patched version is always preferred). Chosen: Node 22 LTS, TypeScript 5.9, Express 5, Prisma 6.19, Zod 4, Vitest 4, pino 9, ESLint 9, Next.js 16 (16.4.6; upgraded from 15.5.29 to clear high-severity bundled `postcss` advisory), React 19, Tailwind CSS 4, PostgreSQL 16. Exception: nodemailer 10.x (all earlier majors have open high-severity advisories).
 
 ## TD-01 Modular monolith, two independent packages
 - **Decision:** One Express API organised by domain modules + one Next.js app; separate `package.json`s, no monorepo tooling.
