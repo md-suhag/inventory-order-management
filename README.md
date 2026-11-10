@@ -2,7 +2,7 @@
 
 A portfolio-grade inventory and order management system for a small/medium business: purchasing and goods receipts, an append-only stock ledger, customer orders with invoices, payments and refunds, sales returns, reports, RBAC and audit logs — built with a focus on data integrity under concurrency.
 
-> **Status:** Phase 9 (Deployment Preparation) complete — ready for review before Phase 10 (Final Review). See [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
+> **Status:** All 10 phases (Phases 0–10) complete & verified — MVP ready for production deployment. See [docs/FINAL_REVIEW.md](docs/FINAL_REVIEW.md) and [PROJECT_PROGRESS.md](PROJECT_PROGRESS.md).
 
 > **Contributors and AI agents:** read [AGENTS.md](AGENTS.md) first — working rules, owner decisions, conventions and setup. The original brief is in [docs/PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md).
 
@@ -26,7 +26,7 @@ docker compose up -d
 # 2. Backend
 cd backend
 cp .env.example .env          # defaults work with docker compose
-npm install
+npm ci
 npx prisma migrate deploy     # apply migrations
 npm run db:seed               # permissions, roles, settings, payment methods, initial admin
 npm run dev                   # http://localhost:4000
@@ -105,5 +105,6 @@ docker-compose.prod.yml  production PostgreSQL, migrate, backend, frontend stack
 | Security | [docs/security/SECURITY.md](docs/security/SECURITY.md) |
 | Testing | [docs/testing/TESTING_STRATEGY.md](docs/testing/TESTING_STRATEGY.md) |
 | Deployment | [docs/deployment/DEPLOYMENT.md](docs/deployment/DEPLOYMENT.md) |
+| Final review | [Phase 10 completion checklist](docs/FINAL_REVIEW.md) · [Progress log](PROJECT_PROGRESS.md) |
 
 ![Database overview](docs/diagrams/ERD.png)

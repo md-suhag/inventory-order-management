@@ -84,21 +84,22 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 
 | Suite | Tests | Result |
 |-------|-------|--------|
-| Backend Unit (`tests/unit`) | 7 files (incl. `payments-and-returns.test.ts`) | ✅ (unit tests passed; full suite verified in CI) |
-| Backend Integration (`tests/integration`, PostgreSQL 16) | 21 files (incl. `critical-scenarios.test.ts`) | ✅ (`critical-scenarios` 8/8 passed after final lock fix; full suite verified in CI) |
-| Frontend Unit & Component (`frontend/tests/unit`, Vitest) | 4 files (`format`, `security-and-csv`, `permissions-and-cookies`, `components`) | Lint/typecheck/build clean (executed in CI) |
+| Backend Unit (`tests/unit`) | 7 files | ✅ Passed (part of 28-file / 230-test Vitest run) |
+| Backend Integration (`tests/integration`, PostgreSQL 16) | 21 files (incl. `critical-scenarios.test.ts` & supplier payments) | ✅ Passed (all 28 files / 230 tests passed in Phase 10) |
+| Frontend Unit & Component (`frontend/tests/unit`, Vitest) | 4 files / 18 tests (`format`, `security-and-csv`, `permissions-and-cookies`, `components`) | ✅ Passed + `lint`/`typecheck`/`next build` clean |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
-| E2E (`frontend/e2e/workflow.spec.ts`, Playwright) | Full workflow + auth redirect | Lint/typecheck clean (run manually against live stack) |
+| E2E (`frontend/e2e/workflow.spec.ts`, Playwright) | 2 specs (auth guard + full lifecycle incl. supplier payment) | ✅ Passed (2/2 in Chromium, `12.2s`) |
 
 ## Documentation status
 
 | Document | Status |
 |----------|--------|
 | requirements/* (4) | ✅ |
-| architecture/* (3) | ✅ updated with review decisions |
-| database/DATABASE_DESIGN.md, diagrams/* | ✅ |
-| api/API_DESIGN.md, api/openapi.yaml | ✅ auth/health/roles; extended per module |
-| security/SECURITY.md | ✅ updated for Phases 7–8 controls |
+| architecture/* (3) | ✅ updated through Phase 10 (`proxy.ts`, `sales-returns/`, `/payments/:id/reverse`) |
+| database/DATABASE_DESIGN.md, diagrams/* | ✅ synced with `20261109120000_order_fulfillment`; SVG/PNG re-exported |
+| api/API_DESIGN.md, api/openapi.yaml | ✅ 81 paths / 112 operations (100% route parity verified) |
+| security/SECURITY.md | ✅ updated for Phases 7–9 controls |
 | testing/TESTING_STRATEGY.md | ✅ updated with Phase 8 critical scenarios, frontend Vitest & Playwright |
 | deployment/DEPLOYMENT.md | ✅ |
-| README.md | ✅ setup, scripts, and deployment section |
+| docs/FINAL_REVIEW.md | ✅ Phase 10 final review & completion checklist |
+| README.md | ✅ setup, scripts, deployment, and Phase 10 completion links |
