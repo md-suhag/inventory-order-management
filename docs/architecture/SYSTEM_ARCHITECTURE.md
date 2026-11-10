@@ -102,7 +102,7 @@ Cross-module calls go through the other module's service (e.g. orders → `inven
 
 ### 3.6 API conventions
 
-- Base path `/api/v1`; JSON; plural resource nouns; state transitions as sub-resource actions: `POST /orders/:id/confirm`, `/complete`, `/cancel`; `POST /purchases/:id/receipts`; `POST /payments/:id/reversal`.
+- Base path `/api/v1`; JSON; plural resource nouns; state transitions as sub-resource actions: `POST /orders/:id/confirm`, `/complete`, `/cancel`; `POST /purchases/:id/receipts`; `POST /payments/:id/reverse`.
 - Success: `200/201` with `{ "data": … }`; lists `{ "data": [...], "meta": { "page", "pageSize", "total", "totalPages" } }`.
 - Error: `{ "error": { "code": "INSUFFICIENT_STOCK", "message": "…", "details": [...], "requestId": "…" } }` with `400` (malformed), `401`, `403`, `404`, `409` (state conflict / duplicate), `422` (validation or business rule), `429`, `500`.
 - Query: `page`, `pageSize`, `sort=field:asc|desc` (whitelisted), `search`, filters by name, date ranges `from`/`to` (ISO dates, business timezone) — all parsed by the shared list query builder (TD-25).
@@ -121,7 +121,7 @@ frontend/src/
 │   ├── (auth)/login, forgot-password, reset-password, register
 │   └── (dashboard)/layout.tsx          sidebar shell + auth guard
 │       ├── dashboard/  products/  categories/  suppliers/  customers/
-│       ├── purchases/  inventory/  orders/  payments/  returns/  reports/
+│       ├── purchases/  inventory/  orders/  payments/  sales-returns/  reports/
 │       ├── users/  roles/  audit-logs/  settings/  profile/
 │       └── orders/[id]/invoice         print-optimised invoice view
 ├── components/ui/      shadcn/ui primitives
@@ -130,12 +130,12 @@ frontend/src/
 ├── lib/auth/           session helpers (cookies, current user + permissions), can(permission)
 ├── lib/format/         Intl-based money/date/number formatting from business settings
 ├── actions/            Server Actions per module (mutations → revalidatePath)
-└── middleware.ts       redirects unauthenticated users; refreshes expired access tokens
+└── proxy.ts            redirects unauthenticated users; refreshes expired access tokens
 ```
 
 - Pages are **Server Components** that fetch with `fetch(..., { cache: 'no-store' })`; list state (page, search, sort, filters) lives in URL search params; `loading.tsx` / `error.tsx` provide loading and error states.
 - Mutations are **Server Actions** (validated with Zod, then call the API) returning field errors to forms via `useActionState`; small interactive pieces (dialogs, line-item editors) are client components using React state.
-- Auth guard: `middleware.ts` checks the session cookies, refreshes an expired access token, and redirects to `/login?next=…`. The backend remains the authority.
+- Auth guard: `proxy.ts` checks the session cookies, refreshes an expired access token, and redirects to `/login?next=…`. The backend remains the authority.
 - Permission-aware UI: the current user's permissions are loaded server-side and used to render navigation and actions.
 
 ## 5. Deployment topology

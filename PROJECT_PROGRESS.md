@@ -16,7 +16,7 @@ _Last updated: 2026-11-10_
 | 7 · Frontend | ✅ Approved & merged 2026-11-10 | Next.js 16.4.6 BFF (HttpOnly cookies, `proxy.ts` refresh), React 19, Tailwind 4, shadcn/ui, all 15 module UIs connected to `/api/v1` |
 | 8 · Testing & hardening | ✅ Approved & merged 2026-11-10 | Critical concurrency/idempotency/rollback integration tests, payment/return/route-security unit tests, frontend Vitest + Testing Library suite, Playwright E2E workflow, backend lock/idempotency fixes, frontend security headers & CSV/open-redirect hardening |
 | 9 · Deployment preparation | ✅ Approved & merged 2026-11-10 | Multi-stage non-root Dockerfiles (`backend/Dockerfile`, `frontend/Dockerfile`), `docker-compose.prod.yml` + fullstack dev profile, `.env.prod.example`, least-privilege DB role SQL (`scripts/db/harden-app-role.sql`), backup/restore scripts, `DEPLOYMENT.md`, README & CI Docker verification |
-| 10 · Final review | ⏳ | |
+| 10 · Final review | ✅ Complete (pending owner merge) | Cross-cutting audit across requirements, architecture, frontend, DB/ERD, OpenAPI, security, tests & deployment (`docs/FINAL_REVIEW.md`); completed supplier payments (`POST/GET /purchases/:id/payments`, `POST /purchases/:id/refunds`, UI + tests), synced ERD SVG/PNG exports, fixed minor doc drift |
 
 ## Modules
 
@@ -40,10 +40,10 @@ _Last updated: 2026-11-10_
 
 ## Next steps (handoff — start here)
 
-Any agent/developer continuing the work: read `AGENTS.md` first, then:
+Phase 10 Final Review is complete on `phase-10/final-review` (see `docs/FINAL_REVIEW.md`). Optional final manual verification before tagging/releasing:
 
-1. Create branch `phase-10/final-review` from `main` for Phase 10: Final Review.
-2. Audit functional requirements, backend/frontend quality, DB/ERD/API parity, security, tests, deployment readiness, and produce the final completion checklist.
+1. Run live-stack Playwright E2E (`cd frontend && npx playwright test`) against running backend + frontend servers.
+2. Fast-forward merge `phase-10/final-review` into `main` once approved (`git checkout main && git merge --ff-only phase-10/final-review`).
 
 ## Phase 2 deliverables
 
@@ -72,7 +72,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 | Branch | Content |
 |--------|---------|
 | `main` | Phase 0–9 complete |
-| `phase-10/final-review` | Phase 10 (next) |
+| `phase-10/final-review` | Phase 10 Final Review (ready for owner merge) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
