@@ -55,6 +55,8 @@ npm run lint && npm run typecheck
 
 On Windows Git Bash, prefix `docker run -v ...` commands with `MSYS_NO_PATHCONV=1`.
 
+To add/update dependencies without drifting from CI and Node 22 containers (`packageManager`: `npm@10.9.2`), run `npx npm@10.9.2 install <pkg>` (or `npx npm@10.9.2 install --package-lock-only` after updating dependencies) so `package-lock.json` stays compatible with both npm 10 and newer npm versions.
+
 ## 6. Backend conventions (follow existing code)
 
 - **Module layout:** `src/modules/<module>/{<module>.routes.ts, .controller.ts, .service.ts, .schemas.ts}`; register the router in `src/routes.ts` (`apiModules`).
