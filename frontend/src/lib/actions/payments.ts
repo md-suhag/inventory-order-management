@@ -76,11 +76,82 @@ export async function recordOrderRefundAction(
   }
 }
 
+export async function recordPurchasePaymentAction(
+  purchaseId: string,
+  input: {
+    paymentMethodId: string;
+    amount: string;
+    paidAt?: string | null;
+    reference?: string | null;
+    notes?: string | null;
+  },
+  idempotencyKey: string,
+): Promise<ActionResult<PaymentDetail>> {
+  try {
+    const data = await apiFetch<PaymentDetail>(`/purchases/${purchaseId}/payments`, {
+      method: 'POST',
+      body: {
+        paymentMethodId: input.paymentMethodId,
+        amount: input.amount,
+        ...(input.paidAt ? { paidAt: input.paidAt } : {}),
+        reference: input.reference || null,
+        notes: input.notes || null,
+      },
+      idempotencyKey,
+      allowCookieMutation: true,
+    });
+    revalidatePath(`/purchases/${purchaseId}`);
+    revalidatePath('/purchases');
+    revalidatePath('/payments');
+    revalidatePath('/suppliers');
+    revalidatePath('/');
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: toActionError(err) };
+  }
+}
+
+export async function recordPurchaseRefundAction(
+  purchaseId: string,
+  input: {
+    paymentMethodId: string;
+    amount: string;
+    paidAt?: string | null;
+    reference?: string | null;
+    notes?: string | null;
+  },
+  idempotencyKey: string,
+): Promise<ActionResult<PaymentDetail>> {
+  try {
+    const data = await apiFetch<PaymentDetail>(`/purchases/${purchaseId}/refunds`, {
+      method: 'POST',
+      body: {
+        paymentMethodId: input.paymentMethodId,
+        amount: input.amount,
+        ...(input.paidAt ? { paidAt: input.paidAt } : {}),
+        reference: input.reference || null,
+        notes: input.notes || null,
+      },
+      idempotencyKey,
+      allowCookieMutation: true,
+    });
+    revalidatePath(`/purchases/${purchaseId}`);
+    revalidatePath('/purchases');
+    revalidatePath('/payments');
+    revalidatePath('/suppliers');
+    revalidatePath('/');
+    return { ok: true, data };
+  } catch (err) {
+    return { ok: false, error: toActionError(err) };
+  }
+}
+
 export async function reversePaymentAction(
   paymentId: string,
   reason: string,
   idempotencyKey: string,
   orderId?: string | null,
+  purchaseId?: string | null,
 ): Promise<ActionResult<PaymentDetail>> {
   try {
     const data = await apiFetch<PaymentDetail>(`/payments/${paymentId}/reverse`, {
@@ -91,7 +162,9 @@ export async function reversePaymentAction(
     });
     revalidatePath('/payments');
     revalidatePath('/orders');
+    revalidatePath('/purchases');
     if (orderId) revalidatePath(`/orders/${orderId}`);
+    if (purchaseId) revalidatePath(`/purchases/${purchaseId}`);
     revalidatePath('/');
     return { ok: true, data };
   } catch (err) {

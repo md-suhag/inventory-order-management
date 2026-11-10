@@ -1,4 +1,4 @@
-import { Prisma, type OrderStatus, type PaymentStatus, type PaymentType } from '@prisma/client';
+import { Prisma, type OrderStatus, type PaymentStatus, type PaymentType, type PurchaseStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
 import { recordAudit, type RequestContext } from '../../common/audit/audit';
 import { withIdempotentTransaction, type Tx } from '../../common/db/transaction';
@@ -139,6 +139,42 @@ async function findReplayedPayment(
   return { replayed: true, payment: mapPayment(existing) };
 }
 
+async function validateMethodAndDate(
+  tx: Tx,
+  paymentMethodId: string,
+  paidAtInput?: string | null,
+): Promise<Date> {
+  const method = await tx.paymentMethod.findUnique({ where: { id: paymentMethodId } });
+  if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
+  if (!method.isActive) {
+    throw businessRule('Payment method is not active', [
+      { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
+    ]);
+  }
+
+  const now = new Date();
+  const paidAt = paidAtInput ? new Date(paidAtInput) : now;
+  if (Number.isNaN(paidAt.getTime())) {
+    throw businessRule('Invalid payment date', [{ field: 'paidAt', message: 'Invalid paidAt timestamp' }]);
+  }
+  if (paidAt.getTime() > now.getTime() + 60_000) {
+    throw businessRule('Payment date cannot be in the future', [
+      { field: 'paidAt', message: 'paidAt cannot be in the future' },
+    ]);
+  }
+  return paidAt;
+}
+
+function parsePositiveAmount(raw: string, label: 'Payment' | 'Refund'): Prisma.Decimal {
+  const amount = new Prisma.Decimal(raw);
+  if (amount.lessThanOrEqualTo(0)) {
+    throw businessRule(`${label} amount must be greater than zero`, [
+      { field: 'amount', message: 'Must be positive' },
+    ]);
+  }
+  return amount;
+}
+
 export async function recordOrderPayment(
   orderId: string,
   input: RecordPaymentInput,
@@ -177,23 +213,8 @@ export async function recordOrderPayment(
 
       if (!order) throw notFound('Order');
 
-      // 3. Validate payment method (BR-PAY-10)
-      const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
-      if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
-      if (!method.isActive) {
-        throw businessRule('Payment method is not active', [
-          { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
-        ]);
-      }
-
-      // 4. Validate paidAt (cannot be in the future, BR-PAY-10)
-      const now = new Date();
-      const paidAt = input.paidAt ? new Date(input.paidAt) : now;
-      if (paidAt.getTime() > now.getTime() + 60_000) {
-        throw businessRule('Payment date cannot be in the future', [
-          { field: 'paidAt', message: 'paidAt cannot be in the future' },
-        ]);
-      }
+      // 3-4. Validate payment method & paidAt (BR-PAY-10)
+      const paidAt = await validateMethodAndDate(tx, input.paymentMethodId, input.paidAt);
 
     // Customer payments allowed on CONFIRMED, SHIPPED, DELIVERED, COMPLETED (BR-PAY-02)
     const allowedStatuses: OrderStatus[] = ['CONFIRMED', 'SHIPPED', 'DELIVERED', 'COMPLETED'];
@@ -205,12 +226,7 @@ export async function recordOrderPayment(
     }
 
     // 5. Overpayment check (BR-PAY-03)
-    const amount = new Prisma.Decimal(input.amount);
-    if (amount.lessThanOrEqualTo(0)) {
-      throw businessRule('Payment amount must be greater than zero', [
-        { field: 'amount', message: 'Must be positive' },
-      ]);
-    }
+    const amount = parsePositiveAmount(input.amount, 'Payment');
 
     const effectiveTotal = new Prisma.Decimal(order.total_amount).sub(order.returned_amount);
     const netPaid = new Prisma.Decimal(order.paid_amount).sub(order.refunded_amount);
@@ -321,31 +337,11 @@ export async function recordOrderRefund(
 
       if (!order) throw notFound('Order');
 
-      // 3. Validate payment method
-      const method = await tx.paymentMethod.findUnique({ where: { id: input.paymentMethodId } });
-      if (!method) throw invalidReference('paymentMethodId', 'Payment method not found');
-      if (!method.isActive) {
-        throw businessRule('Payment method is not active', [
-          { field: 'paymentMethodId', message: `Method "${method.name}" is deactivated` },
-        ]);
-      }
-
-      // 4. Validate paidAt
-      const now = new Date();
-      const paidAt = input.paidAt ? new Date(input.paidAt) : now;
-      if (paidAt.getTime() > now.getTime() + 60_000) {
-        throw businessRule('Payment date cannot be in the future', [
-          { field: 'paidAt', message: 'paidAt cannot be in the future' },
-        ]);
-      }
+      // 3-4. Validate payment method & paidAt (BR-PAY-10)
+      const paidAt = await validateMethodAndDate(tx, input.paymentMethodId, input.paidAt);
 
     // 5. Refund limit check (BR-PAY-04)
-    const amount = new Prisma.Decimal(input.amount);
-    if (amount.lessThanOrEqualTo(0)) {
-      throw businessRule('Refund amount must be greater than zero', [
-        { field: 'amount', message: 'Must be positive' },
-      ]);
-    }
+    const amount = parsePositiveAmount(input.amount, 'Refund');
 
     const paidAmount = new Prisma.Decimal(order.paid_amount);
     const refundedAmount = new Prisma.Decimal(order.refunded_amount);
@@ -569,12 +565,13 @@ export async function reversePayment(
       const [purchase] = await tx.$queryRaw<
         {
           id: string;
+          status: PurchaseStatus;
           total_amount: Prisma.Decimal;
           paid_amount: Prisma.Decimal;
           refunded_amount: Prisma.Decimal;
         }[]
       >`
-        SELECT id, total_amount, paid_amount, refunded_amount
+        SELECT id, status, total_amount, paid_amount, refunded_amount
         FROM purchases
         WHERE id = ${original.purchase_id}::uuid
         FOR UPDATE`;
@@ -592,7 +589,10 @@ export async function reversePayment(
           refundedAmount = refundedAmount.sub(original.amount);
         }
 
-        const effectiveTotal = new Prisma.Decimal(purchase.total_amount);
+        const effectiveTotal =
+          purchase.status === 'CANCELLED'
+            ? new Prisma.Decimal(0)
+            : new Prisma.Decimal(purchase.total_amount);
         const newPaymentStatus = computeOrderPaymentStatus(effectiveTotal, paidAmount, refundedAmount);
 
         await tx.purchase.update({
@@ -666,6 +666,260 @@ export async function listOrderPayments(orderId: string): Promise<PaymentDetail[
 
   const payments = await prisma.payment.findMany({
     where: { orderId },
+    select: paymentSelect,
+    orderBy: { createdAt: 'desc' },
+  });
+
+  return payments.map(mapPayment);
+}
+
+/** Records a supplier payment against an active confirmed/receiving purchase (BR-PAY-02, BR-PAY-03). */
+export async function recordPurchasePayment(
+  purchaseId: string,
+  input: RecordPaymentInput,
+  ctx: RequestContext,
+  idempotencyKey?: string,
+): Promise<{ replayed: boolean; payment: PaymentDetail }> {
+  const matches = (existing: PaymentRow) =>
+    existing.purchaseId === purchaseId &&
+    existing.paymentMethod.id === input.paymentMethodId &&
+    new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
+    existing.type === 'PAYMENT';
+
+  return withIdempotentTransaction(
+    async (tx) => {
+      const [purchase] = await tx.$queryRaw<
+        {
+          id: string;
+          status: PurchaseStatus;
+          total_amount: Prisma.Decimal;
+          paid_amount: Prisma.Decimal;
+          refunded_amount: Prisma.Decimal;
+        }[]
+      >`
+        SELECT id, status, total_amount, paid_amount, refunded_amount
+        FROM purchases
+        WHERE id = ${purchaseId}::uuid
+        FOR UPDATE`;
+
+      if (idempotencyKey) {
+        const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
+        if (replayed) return replayed;
+      }
+
+      if (!purchase) throw notFound('Purchase');
+
+      const paidAt = await validateMethodAndDate(tx, input.paymentMethodId, input.paidAt);
+
+      const allowedStatuses: PurchaseStatus[] = ['ORDERED', 'PARTIALLY_RECEIVED', 'RECEIVED'];
+      if (!allowedStatuses.includes(purchase.status)) {
+        throw conflict(
+          `Payments are not allowed on purchases with status ${purchase.status}`,
+          ErrorCode.INVALID_STATE_TRANSITION,
+        );
+      }
+
+      const amount = parsePositiveAmount(input.amount, 'Payment');
+      const effectiveTotal = new Prisma.Decimal(purchase.total_amount);
+      const netPaid = new Prisma.Decimal(purchase.paid_amount).sub(purchase.refunded_amount);
+      const balanceDue = effectiveTotal.sub(netPaid);
+
+      if (amount.greaterThan(balanceDue)) {
+        throw businessRule(
+          `Payment amount (${amount.toFixed(2)}) exceeds balance due (${balanceDue.toFixed(2)})`,
+          [{ field: 'amount', message: `Overpayment is rejected. Balance due is ${balanceDue.toFixed(2)}` }],
+        );
+      }
+
+      const paymentNumber = await nextDocumentNumber(tx, 'PAYMENT');
+      const payment = await tx.payment.create({
+        data: {
+          paymentNumber,
+          type: 'PAYMENT',
+          purchaseId,
+          paymentMethodId: input.paymentMethodId,
+          amount,
+          paidAt,
+          reference: input.reference ?? null,
+          notes: input.notes ?? null,
+          idempotencyKey: idempotencyKey ?? null,
+          recordedById: ctx.actorId!,
+        },
+        include: {
+          paymentMethod: { select: { id: true, code: true, name: true } },
+          recordedBy: { select: publicUserSelect },
+        },
+      });
+
+      const newPaidAmount = new Prisma.Decimal(purchase.paid_amount).add(amount);
+      const newPaymentStatus = computeOrderPaymentStatus(
+        effectiveTotal,
+        newPaidAmount,
+        new Prisma.Decimal(purchase.refunded_amount),
+      );
+
+      await tx.purchase.update({
+        where: { id: purchaseId },
+        data: { paidAmount: newPaidAmount, paymentStatus: newPaymentStatus },
+      });
+
+      await recordAudit(tx, ctx, {
+        action: 'payment.recorded',
+        entityType: 'payment',
+        entityId: payment.id,
+        metadata: {
+          paymentNumber,
+          purchaseId,
+          amount: amount.toString(),
+          paymentStatus: newPaymentStatus,
+        },
+      });
+
+      return { replayed: false, payment: mapPayment(payment) };
+    },
+    {
+      idempotencyKey,
+      onReplay: () =>
+        idempotencyKey ? findReplayedPayment(prisma, idempotencyKey, matches) : Promise.resolve(null),
+    },
+  );
+}
+
+/** Records a supplier refund against a cancelled or overpaid purchase (BR-PAY-04). */
+export async function recordPurchaseRefund(
+  purchaseId: string,
+  input: RecordRefundInput,
+  ctx: RequestContext,
+  idempotencyKey?: string,
+): Promise<{ replayed: boolean; payment: PaymentDetail }> {
+  if (input.salesReturnId) {
+    throw businessRule('Sales returns cannot be linked to supplier purchase refunds', [
+      { field: 'salesReturnId', message: 'Not applicable to purchase refunds' },
+    ]);
+  }
+
+  const matches = (existing: PaymentRow) =>
+    existing.purchaseId === purchaseId &&
+    existing.paymentMethod.id === input.paymentMethodId &&
+    new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
+    existing.type === 'REFUND';
+
+  return withIdempotentTransaction(
+    async (tx) => {
+      const [purchase] = await tx.$queryRaw<
+        {
+          id: string;
+          status: PurchaseStatus;
+          total_amount: Prisma.Decimal;
+          paid_amount: Prisma.Decimal;
+          refunded_amount: Prisma.Decimal;
+        }[]
+      >`
+        SELECT id, status, total_amount, paid_amount, refunded_amount
+        FROM purchases
+        WHERE id = ${purchaseId}::uuid
+        FOR UPDATE`;
+
+      if (idempotencyKey) {
+        const replayed = await findReplayedPayment(tx, idempotencyKey, matches);
+        if (replayed) return replayed;
+      }
+
+      if (!purchase) throw notFound('Purchase');
+
+      const paidAt = await validateMethodAndDate(tx, input.paymentMethodId, input.paidAt);
+      const amount = parsePositiveAmount(input.amount, 'Refund');
+
+      const paidAmount = new Prisma.Decimal(purchase.paid_amount);
+      const refundedAmount = new Prisma.Decimal(purchase.refunded_amount);
+      const netPaid = paidAmount.sub(refundedAmount);
+
+      if (amount.greaterThan(netPaid)) {
+        throw businessRule(
+          `Refund amount (${amount.toFixed(2)}) exceeds net paid amount (${netPaid.toFixed(2)})`,
+          [{ field: 'amount', message: `Cannot refund more than net paid amount (${netPaid.toFixed(2)})` }],
+        );
+      }
+
+      const effectiveTotal =
+        purchase.status === 'CANCELLED'
+          ? new Prisma.Decimal(0)
+          : new Prisma.Decimal(purchase.total_amount);
+      const balanceDue = effectiveTotal.sub(netPaid);
+
+      if (purchase.status !== 'CANCELLED') {
+        if (balanceDue.greaterThanOrEqualTo(0)) {
+          throw businessRule(
+            'No refund is owed on an active purchase with non-negative balance due',
+            [{ field: 'amount', message: 'Purchase has no refundable credit' }],
+          );
+        }
+        const refundableCredit = balanceDue.negated();
+        if (amount.greaterThan(refundableCredit)) {
+          throw businessRule(
+            `Refund amount (${amount.toFixed(2)}) exceeds refundable credit (${refundableCredit.toFixed(2)})`,
+            [{ field: 'amount', message: `Maximum refundable credit is ${refundableCredit.toFixed(2)}` }],
+          );
+        }
+      }
+
+      const paymentNumber = await nextDocumentNumber(tx, 'PAYMENT');
+      const payment = await tx.payment.create({
+        data: {
+          paymentNumber,
+          type: 'REFUND',
+          purchaseId,
+          paymentMethodId: input.paymentMethodId,
+          amount,
+          paidAt,
+          reference: input.reference ?? null,
+          notes: input.notes ?? null,
+          idempotencyKey: idempotencyKey ?? null,
+          recordedById: ctx.actorId!,
+        },
+        include: {
+          paymentMethod: { select: { id: true, code: true, name: true } },
+          recordedBy: { select: publicUserSelect },
+        },
+      });
+
+      const newRefundedAmount = refundedAmount.add(amount);
+      const newPaymentStatus = computeOrderPaymentStatus(effectiveTotal, paidAmount, newRefundedAmount);
+
+      await tx.purchase.update({
+        where: { id: purchaseId },
+        data: { refundedAmount: newRefundedAmount, paymentStatus: newPaymentStatus },
+      });
+
+      await recordAudit(tx, ctx, {
+        action: 'payment.refunded',
+        entityType: 'payment',
+        entityId: payment.id,
+        metadata: {
+          paymentNumber,
+          purchaseId,
+          amount: amount.toString(),
+          paymentStatus: newPaymentStatus,
+        },
+      });
+
+      return { replayed: false, payment: mapPayment(payment) };
+    },
+    {
+      idempotencyKey,
+      onReplay: () =>
+        idempotencyKey ? findReplayedPayment(prisma, idempotencyKey, matches) : Promise.resolve(null),
+    },
+  );
+}
+
+/** Lists all payment ledger entries linked to a purchase. */
+export async function listPurchasePayments(purchaseId: string): Promise<PaymentDetail[]> {
+  const purchase = await prisma.purchase.findUnique({ where: { id: purchaseId } });
+  if (!purchase) throw notFound('Purchase');
+
+  const payments = await prisma.payment.findMany({
+    where: { purchaseId },
     select: paymentSelect,
     orderBy: { createdAt: 'desc' },
   });

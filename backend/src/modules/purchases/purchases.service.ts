@@ -127,6 +127,18 @@ const purchaseItemSelect = {
   lineTotal: true,
 } satisfies Prisma.PurchaseItemSelect;
 
+function calculateBalanceDue(p: {
+  status: PurchaseStatus;
+  totalAmount: Prisma.Decimal;
+  paidAmount: Prisma.Decimal;
+  refundedAmount: Prisma.Decimal;
+}): string {
+  if (p.status === 'CANCELLED') return '0.00';
+  const netPaid = new Prisma.Decimal(p.paidAmount).sub(p.refundedAmount);
+  const due = new Prisma.Decimal(p.totalAmount).sub(netPaid);
+  return due.isNegative() ? '0.00' : due.toFixed(2);
+}
+
 function formatPurchaseDetail(
   p: Prisma.PurchaseGetPayload<{
     include: {
@@ -146,10 +158,7 @@ function formatPurchaseDetail(
     };
   }>,
 ): PurchaseDetail {
-  const total = new Prisma.Decimal(p.totalAmount);
-  const paid = new Prisma.Decimal(p.paidAmount);
-  const refunded = new Prisma.Decimal(p.refundedAmount);
-  const balanceDue = total.sub(paid).add(refunded).toFixed(2);
+  const balanceDue = calculateBalanceDue(p);
 
   return {
     id: p.id,
@@ -450,8 +459,7 @@ export async function listPurchases(query: ListPurchasesQuery): Promise<Paginate
       return rows.map((r) => {
         const total = new Prisma.Decimal(r.totalAmount);
         const paid = new Prisma.Decimal(r.paidAmount);
-        const refunded = new Prisma.Decimal(r.refundedAmount);
-        const balanceDue = total.sub(paid).add(refunded).toFixed(2);
+        const balanceDue = calculateBalanceDue(r);
 
         return {
           id: r.id,

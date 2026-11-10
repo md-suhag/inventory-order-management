@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import type { Product, PurchaseDetail, Supplier } from '@/lib/api-types';
+import type { PaymentDetail, Product, PurchaseDetail, Supplier } from '@/lib/api-types';
 import { apiFetch, apiFetchPage } from '@/lib/api/client';
 import { can, requireSession } from '@/lib/auth/session';
 import { AccessDenied } from '@/components/shared/access-denied';
@@ -15,7 +15,11 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
   }
 
   const { id } = await params;
-  const purchase = await apiFetch<PurchaseDetail>(`/purchases/${id}`);
+  const canViewPayments = can(user, 'payments.read');
+  const [purchase, payments] = await Promise.all([
+    apiFetch<PurchaseDetail>(`/purchases/${id}`),
+    canViewPayments ? apiFetch<PaymentDetail[]>(`/purchases/${id}/payments`) : Promise.resolve([] as PaymentDetail[]),
+  ]);
 
   const canManage = can(user, 'purchases.manage');
   const [suppliersPage, productsPage] =
@@ -37,6 +41,8 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
       <PurchaseDetailClient
         key={purchase.updatedAt}
         purchase={purchase}
+        payments={payments}
+        paymentMethods={settings.paymentMethods}
         suppliers={suppliersPage.data}
         products={productsPage.data}
         settings={settings.settings}
@@ -45,6 +51,10 @@ export default async function PurchaseDetailPage({ params }: { params: Promise<{
           canConfirm: can(user, 'purchases.confirm'),
           canReceive: can(user, 'purchases.receive'),
           canCancel: can(user, 'purchases.cancel'),
+          canViewPayments,
+          canRecordPayment: can(user, 'payments.record_supplier'),
+          canRefund: can(user, 'payments.refund'),
+          canReverse: can(user, 'payments.reverse'),
         }}
       />
     </>

@@ -316,4 +316,101 @@ describe('Payments Module (Phase 5)', () => {
     expect(res.body.data.length).toBeGreaterThanOrEqual(1);
     expect(res.body.meta).toHaveProperty('total');
   });
+
+  it('records supplier payments, rejects overpayment/STAFF role, supports refund after cancel & reversal (FR-PUR-07, BR-PAY-02..07)', async () => {
+    const supplier = await prisma.supplier.create({ data: { name: 'Pay Vendor', phone: '555-2000' } });
+    const product = await makeProduct('Vendor Stock', `VND-${Date.now()}`, '25.00', 0);
+    const cashMethod = await prisma.paymentMethod.findUniqueOrThrow({ where: { code: 'CASH' } });
+
+    const createPur = await api()
+      .post('/api/v1/purchases')
+      .set(bearer(manager))
+      .send({
+        supplierId: supplier.id,
+        items: [{ productId: product.id, quantity: 10, unitCost: '10.00' }],
+      })
+      .expect(201);
+    const purchaseId = createPur.body.data.id;
+
+    // Draft purchase rejects payment
+    await api()
+      .post(`/api/v1/purchases/${purchaseId}/payments`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', randomUUID())
+      .send({ paymentMethodId: cashMethod.id, amount: '50.00' })
+      .expect(409);
+
+    await api().post(`/api/v1/purchases/${purchaseId}/confirm`).set(bearer(manager)).expect(200);
+
+    // STAFF lacks payments.record_supplier permission
+    await api()
+      .post(`/api/v1/purchases/${purchaseId}/payments`)
+      .set(bearer(staff))
+      .set('Idempotency-Key', randomUUID())
+      .send({ paymentMethodId: cashMethod.id, amount: '40.00' })
+      .expect(403);
+
+    // Advance payment on ORDERED purchase (40.00 of 100.00) + idempotent replay
+    const payKey = randomUUID();
+    const p1 = await api()
+      .post(`/api/v1/purchases/${purchaseId}/payments`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', payKey)
+      .send({ paymentMethodId: cashMethod.id, amount: '40.00', reference: 'SUP-ADV-1' })
+      .expect(201);
+    expect(p1.body.data.purchaseId).toBe(purchaseId);
+
+    const p1Replay = await api()
+      .post(`/api/v1/purchases/${purchaseId}/payments`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', payKey)
+      .send({ paymentMethodId: cashMethod.id, amount: '40.00', reference: 'SUP-ADV-1' })
+      .expect(200);
+    expect(p1Replay.headers['idempotent-replayed']).toBe('true');
+    expect(p1Replay.body.data.id).toBe(p1.body.data.id);
+
+    // Overpayment rejected (> 60.00 remaining)
+    await api()
+      .post(`/api/v1/purchases/${purchaseId}/payments`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', randomUUID())
+      .send({ paymentMethodId: cashMethod.id, amount: '60.01' })
+      .expect(422);
+
+    // Reversing advance payment restores balance to 100.00 UNPAID
+    await api()
+      .post(`${PAYMENTS_BASE}/${p1.body.data.id}/reverse`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', randomUUID())
+      .send({ reason: 'Wrong vendor bank account' })
+      .expect(201);
+
+    let pur = await api().get(`/api/v1/purchases/${purchaseId}`).set(bearer(manager)).expect(200);
+    expect(pur.body.data.balanceDue).toBe('100.00');
+    expect(pur.body.data.paymentStatus).toBe('UNPAID');
+
+    // Pay 50.00, cancel purchase (0 receipts), then record supplier refund of 50.00
+    await api()
+      .post(`/api/v1/purchases/${purchaseId}/payments`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', randomUUID())
+      .send({ paymentMethodId: cashMethod.id, amount: '50.00' })
+      .expect(201);
+
+    await api().post(`/api/v1/purchases/${purchaseId}/cancel`).set(bearer(manager)).expect(200);
+
+    await api()
+      .post(`/api/v1/purchases/${purchaseId}/refunds`)
+      .set(bearer(manager))
+      .set('Idempotency-Key', randomUUID())
+      .send({ paymentMethodId: cashMethod.id, amount: '50.00', reference: 'SUP-REF-1' })
+      .expect(201);
+
+    pur = await api().get(`/api/v1/purchases/${purchaseId}`).set(bearer(manager)).expect(200);
+    expect(pur.body.data.paymentStatus).toBe('REFUNDED');
+    expect(pur.body.data.balanceDue).toBe('0.00');
+
+    const listRes = await api().get(`/api/v1/purchases/${purchaseId}/payments`).set(bearer(manager)).expect(200);
+    expect(listRes.body.data).toHaveLength(4); // PAY-1, REVERSAL, PAY-2, REFUND
+  });
 });

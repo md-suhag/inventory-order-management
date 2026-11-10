@@ -3,6 +3,7 @@ import { authenticate } from '../../common/middleware/authenticate';
 import { authorize } from '../../common/middleware/authorize';
 import { requireIdempotencyKey } from '../../common/middleware/idempotency-key';
 import * as purchases from './purchases.controller';
+import * as payments from '../payments/payments.controller';
 
 export const purchasesRouter = Router();
 
@@ -21,3 +22,19 @@ purchasesRouter.post(
   purchases.receive,
 );
 purchasesRouter.get('/:id/receipts', authenticate, authorize('purchases.read'), purchases.listReceipts);
+
+purchasesRouter.post(
+  '/:id/payments',
+  authenticate,
+  authorize('payments.record_supplier'),
+  requireIdempotencyKey,
+  payments.createForPurchase,
+);
+purchasesRouter.post(
+  '/:id/refunds',
+  authenticate,
+  authorize('payments.refund'),
+  requireIdempotencyKey,
+  payments.refundForPurchase,
+);
+purchasesRouter.get('/:id/payments', authenticate, authorize('payments.read'), payments.listForPurchase);

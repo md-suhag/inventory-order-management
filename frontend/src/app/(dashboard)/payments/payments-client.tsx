@@ -45,7 +45,13 @@ export function PaymentsClient({
   function handleReverse(reason?: string) {
     if (!reverseTarget || !reason) return;
     startTransition(async () => {
-      const res = await reversePaymentAction(reverseTarget.id, reason, reverseKey, reverseTarget.orderId);
+      const res = await reversePaymentAction(
+        reverseTarget.id,
+        reason,
+        reverseKey,
+        reverseTarget.orderId,
+        reverseTarget.purchaseId,
+      );
       if (res.ok) {
         toast.success(`Reversal ${res.data.paymentNumber} created`);
         setReverseTarget(null);

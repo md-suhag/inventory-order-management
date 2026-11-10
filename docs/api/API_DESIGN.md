@@ -162,6 +162,9 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | POST | `/purchases/:id/cancel` | ✔ | `purchases.cancel` | Allowed from DRAFT or ORDERED with 0 receipts; 409 if receipts exist |
 | POST | `/purchases/:id/receipts` | ✔ | `purchases.receive` | Record goods receipt; increases stock with PURCHASE_RECEIPT movements, blends WAC (BR-INV-05); requires `Idempotency-Key` (BR-PUR-07) |
 | GET | `/purchases/:id/receipts` | ✔ | `purchases.read` | List goods receipts for purchase |
+| POST | `/purchases/:id/payments` | ✔ | `payments.record_supplier` | Record supplier payment; rejects overpayment (BR-PAY-03); updates paidAmount and paymentStatus; requires `Idempotency-Key` |
+| POST | `/purchases/:id/refunds` | ✔ | `payments.refund` | Record supplier refund against cancelled or overpaid purchase (BR-PAY-04); requires `Idempotency-Key` |
+| GET | `/purchases/:id/payments` | ✔ | `payments.read` | List payments, refunds and reversals for purchase |
 | GET | `/inventory` | ✔ | `inventory.read` | Product inventory overview with stockState (IN_STOCK, LOW, OUT); `costPrice` and `stockValue` only with `products.view_cost` |
 | GET | `/inventory/low-stock` | ✔ | `inventory.read` | Quick filter for products at or below reorder level |
 | POST | `/inventory/adjustments` | ✔ | `inventory.adjust` | Single-product stock adjustment (IN/OUT); reason required, non-empty notes mandatory for OTHER; requires `Idempotency-Key` |
