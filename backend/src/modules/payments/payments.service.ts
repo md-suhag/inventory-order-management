@@ -20,6 +20,7 @@ export interface PaymentDetail {
   type: PaymentType;
   orderId: string | null;
   purchaseId: string | null;
+  salesReturnId?: string | null;
   amount: string;
   paidAt: Date;
   reference: string | null;
@@ -46,6 +47,7 @@ const paymentSelect = {
   type: true,
   orderId: true,
   purchaseId: true,
+  salesReturnId: true,
   amount: true,
   paidAt: true,
   reference: true,
@@ -69,6 +71,7 @@ function mapPayment(p: {
   type: PaymentType;
   orderId: string | null;
   purchaseId: string | null;
+  salesReturnId?: string | null;
   amount: Prisma.Decimal;
   paidAt: Date;
   reference: string | null;
@@ -86,6 +89,7 @@ function mapPayment(p: {
     type: p.type,
     orderId: p.orderId,
     purchaseId: p.purchaseId,
+    salesReturnId: p.salesReturnId ?? null,
     amount: formatMoney(p.amount),
     paidAt: p.paidAt,
     reference: p.reference,
@@ -99,7 +103,7 @@ function mapPayment(p: {
   };
 }
 
-function computeOrderPaymentStatus(
+export function computeOrderPaymentStatus(
   effectiveTotal: Prisma.Decimal,
   paidAmount: Prisma.Decimal,
   refundedAmount: Prisma.Decimal,
@@ -290,7 +294,8 @@ export async function recordOrderRefund(
           existing.orderId === orderId &&
           existing.paymentMethodId === input.paymentMethodId &&
           new Prisma.Decimal(existing.amount).equals(new Prisma.Decimal(input.amount)) &&
-          existing.type === 'REFUND';
+          existing.type === 'REFUND' &&
+          existing.salesReturnId === (input.salesReturnId ?? null);
 
         if (!matches) {
           throw conflict('Idempotency key reused with different payload', ErrorCode.IDEMPOTENCY_KEY_REUSED);
@@ -377,6 +382,29 @@ export async function recordOrderRefund(
       }
     }
 
+    if (input.salesReturnId) {
+      const salesReturn = await tx.salesReturn.findUnique({ where: { id: input.salesReturnId } });
+      if (!salesReturn || salesReturn.orderId !== orderId) {
+        throw invalidReference('salesReturnId', 'Sales return not found for this order');
+      }
+      if (salesReturn.status !== 'COMPLETED') {
+        throw conflict('Refunds can only be issued for completed sales returns', ErrorCode.INVALID_STATE_TRANSITION);
+      }
+      const existingRefunds = await tx.payment.findMany({
+        where: { salesReturnId: input.salesReturnId, type: 'REFUND' },
+        select: { amount: true, reversal: { select: { id: true } } },
+      });
+      const activeRefunds = existingRefunds.filter((r) => !r.reversal);
+      const refundedForReturn = activeRefunds.reduce((sum, r) => sum.add(r.amount), new Prisma.Decimal(0));
+      const remainingReturnAmount = new Prisma.Decimal(salesReturn.totalAmount).sub(refundedForReturn);
+      if (amount.greaterThan(remainingReturnAmount)) {
+        throw businessRule(
+          `Refund amount (${amount.toFixed(2)}) exceeds remaining unrefunded return amount (${remainingReturnAmount.toFixed(2)})`,
+          [{ field: 'amount', message: `Maximum refundable for this return is ${remainingReturnAmount.toFixed(2)}` }],
+        );
+      }
+    }
+
     // 6. Allocate payment number
     const paymentNumber = await nextDocumentNumber(tx, 'PAYMENT');
 
@@ -385,6 +413,7 @@ export async function recordOrderRefund(
         paymentNumber,
         type: 'REFUND',
         orderId,
+        salesReturnId: input.salesReturnId ?? null,
         paymentMethodId: input.paymentMethodId,
         amount,
         paidAt,
@@ -422,6 +451,7 @@ export async function recordOrderRefund(
       metadata: {
         paymentNumber,
         orderId,
+        salesReturnId: input.salesReturnId ?? null,
         amount: amount.toString(),
         paymentStatus: newPaymentStatus,
       },

@@ -16,6 +16,7 @@ export const recordPaymentSchema = z.object({
 export const recordRefundSchema = z.object({
   paymentMethodId: uuidSchema,
   amount: decimalString(12, 2),
+  salesReturnId: uuidSchema.optional(),
   paidAt: z.string().optional().nullable(),
   reference: optionalText(100),
   notes: optionalText(2000),
