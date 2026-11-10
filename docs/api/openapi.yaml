@@ -41,6 +41,14 @@ tags:
     description: Customer orders, line snapshotting and lifecycle
   - name: Payments
     description: Payment ledger, refunds and reversals
+  - name: Sales Returns
+    description: Customer returns, restocking and refund linkage
+  - name: Reports
+    description: Sales, purchases, inventory valuation and financial analytics
+  - name: Audit Logs
+    description: Tamper-evident activity trail
+  - name: Settings
+    description: Business settings, document sequences and payment methods
 
 security:
   - bearerAuth: []
@@ -2277,6 +2285,586 @@ paths:
         '409': { $ref: '#/components/responses/Conflict' }
         '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
 
+  # ---------------------------------------------------------------------------
+  # Sales Returns
+  # ---------------------------------------------------------------------------
+
+  /sales-returns:
+    get:
+      tags: [Sales Returns]
+      summary: List sales returns
+      x-permission: returns.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: orderId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: customerId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          schema: { type: string, enum: [PENDING, COMPLETED, REJECTED] }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: sort
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated sales returns list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/SalesReturnListItem' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+    post:
+      tags: [Sales Returns]
+      summary: Create a sales return request
+      description: Returns are allowed against delivered or completed orders. Quantities are validated against prior returns.
+      x-permission: returns.create
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateSalesReturnInput' }
+      responses:
+        '200':
+          description: Replayed sales return request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SalesReturnDetail' }
+        '201':
+          description: Sales return request created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SalesReturnDetail' }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /sales-returns/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Sales Returns]
+      summary: Get sales return detail
+      x-permission: returns.read
+      responses:
+        '200':
+          description: Sales return detail
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SalesReturnDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /sales-returns/{id}/complete:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Sales Returns]
+      summary: Complete/approve a sales return
+      description: Restores inventory for resalable lines via SALE_RETURN movement, updates order returnedAmount and recalculates payment status.
+      x-permission: returns.process
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CompleteSalesReturnInput' }
+      responses:
+        '200':
+          description: Sales return completed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SalesReturnDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /sales-returns/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Sales Returns]
+      summary: Reject a sales return request
+      description: Rejection reason is mandatory.
+      x-permission: returns.process
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RejectSalesReturnInput' }
+      responses:
+        '200':
+          description: Sales return rejected
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/SalesReturnDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /sales-returns/{id}/refund:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    post:
+      tags: [Sales Returns]
+      summary: Issue a refund for a completed sales return
+      x-permission: payments.refund
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RefundSalesReturnInput' }
+      responses:
+        '200':
+          description: Refund payment replayed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '201':
+          description: Refund payment created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  # ---------------------------------------------------------------------------
+  # Reports
+  # ---------------------------------------------------------------------------
+
+  /reports/sales/summary:
+    get:
+      tags: [Reports]
+      summary: Sales summary report
+      description: Gross sales, discounts, returns, net sales, tax collected, periodic breakdown and orders by status.
+      x-permission: reports.sales
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: groupBy
+          in: query
+          schema: { type: string, enum: [day, week, month], default: day }
+      responses:
+        '200':
+          description: Sales summary report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesSummaryReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/sales/by-product:
+    get:
+      tags: [Reports]
+      summary: Sales by product report
+      description: Quantity sold/returned and sales per product; margin/COGS included with products.view_cost.
+      x-permission: reports.sales
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Sales by product report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesByProductReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/sales/by-customer:
+    get:
+      tags: [Reports]
+      summary: Sales by customer report
+      x-permission: reports.sales
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Sales by customer report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SalesByCustomerReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/purchases:
+    get:
+      tags: [Reports]
+      summary: Purchases report
+      description: Ordered value, received value, paid amount and breakdown by supplier.
+      x-permission: reports.purchases
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: supplierId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Purchases report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PurchasesReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/inventory/summary:
+    get:
+      tags: [Reports]
+      summary: Inventory status and movements summary
+      x-permission: reports.inventory
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Inventory summary report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventorySummaryReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/inventory/valuation:
+    get:
+      tags: [Reports]
+      summary: Inventory valuation report (WAC)
+      description: Requires products.view_cost in addition to reports.inventory.
+      x-permission: reports.inventory
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: categoryId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: search
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Inventory valuation report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InventoryValuationReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/financial/summary:
+    get:
+      tags: [Reports]
+      summary: Financial summary report
+      description: Net sales revenue, estimated gross profit, cash flow in/out and outstanding balances.
+      x-permission: reports.financial
+      parameters:
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Financial summary report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialSummaryReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /reports/financial/aging:
+    get:
+      tags: [Reports]
+      summary: Accounts receivable and payable aging report
+      description: Aged outstanding customer and supplier balances (0-30, 31-60, 61-90, 90+ days).
+      x-permission: reports.financial
+      parameters:
+        - name: asOf
+          in: query
+          schema: { type: string, format: date }
+      responses:
+        '200':
+          description: Financial aging report
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FinancialAgingReport' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ---------------------------------------------------------------------------
+  # Audit Logs
+  # ---------------------------------------------------------------------------
+
+  /audit-logs:
+    get:
+      tags: [Audit Logs]
+      summary: Search and list audit logs
+      x-permission: audit_logs.read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: actorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: action
+          in: query
+          schema: { type: string }
+        - name: entityType
+          in: query
+          schema: { type: string }
+        - name: entityId
+          in: query
+          schema: { type: string }
+        - name: from
+          in: query
+          schema: { type: string, format: date }
+        - name: to
+          in: query
+          schema: { type: string, format: date }
+        - name: sort
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated audit logs list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AuditLogItem' }
+                  meta: { $ref: '#/components/schemas/PageMeta' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /audit-logs/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    get:
+      tags: [Audit Logs]
+      summary: Get audit log entry by ID
+      x-permission: audit_logs.read
+      responses:
+        '200':
+          description: Audit log entry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/AuditLogItem' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ---------------------------------------------------------------------------
+  # Settings
+  # ---------------------------------------------------------------------------
+
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Get business settings, sequences and payment methods
+      responses:
+        '200':
+          description: Full business settings configuration
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FullSettingsResponse' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+
+    patch:
+      tags: [Settings]
+      summary: Update business settings (partial)
+      x-permission: settings.update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSettingsInput' }
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/BusinessSettingsDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+    put:
+      tags: [Settings]
+      summary: Update business settings (replace)
+      x-permission: settings.update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSettingsInput' }
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/BusinessSettingsDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/BusinessRuleOrValidation' }
+
+  /settings/sequences/{documentType}:
+    parameters:
+      - name: documentType
+        in: path
+        required: true
+        schema: { type: string, enum: [ORDER, INVOICE, PURCHASE, PURCHASE_RECEIPT, PAYMENT, SALES_RETURN] }
+    patch:
+      tags: [Settings]
+      summary: Update document sequence prefix or padding
+      x-permission: settings.update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateSequenceInput' }
+      responses:
+        '200':
+          description: Sequence updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/DocumentSequenceDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /settings/payment-methods/{id}:
+    parameters:
+      - $ref: '#/components/parameters/Id'
+    patch:
+      tags: [Settings]
+      summary: Update payment method configuration
+      x-permission: settings.update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdatePaymentMethodInput' }
+      responses:
+        '200':
+          description: Payment method updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data: { $ref: '#/components/schemas/PaymentMethodDetail' }
+        '401': { $ref: '#/components/responses/Unauthenticated' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2420,6 +3008,7 @@ components:
         type: { type: string, enum: [PAYMENT, REFUND, REVERSAL] }
         orderId: { type: string, format: uuid, nullable: true }
         purchaseId: { type: string, format: uuid, nullable: true }
+        salesReturnId: { type: string, format: uuid, nullable: true }
         amount: { type: string, example: '50.00' }
         paidAt: { type: string, format: date-time }
         reference: { type: string, nullable: true }
@@ -2501,6 +3090,7 @@ components:
       properties:
         paymentMethodId: { type: string, format: uuid }
         amount: { type: string, example: '50.00' }
+        salesReturnId: { type: string, format: uuid, nullable: true }
         paidAt: { type: string, format: date-time }
         reference: { type: string, maxLength: 100 }
         notes: { type: string, maxLength: 2000 }
@@ -3118,6 +3708,302 @@ components:
                   message: { type: string }
             requestId: { type: string }
 
+    SalesReturnItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        orderItemId: { type: string, format: uuid }
+        productId: { type: string, format: uuid }
+        productName: { type: string }
+        productSku: { type: string }
+        unit: { type: string }
+        quantity: { type: integer }
+        condition: { type: string, enum: [RESALABLE, DAMAGED] }
+        subtotal: { type: string, example: '50.00' }
+        taxAmount: { type: string, example: '0.00' }
+        totalAmount: { type: string, example: '50.00' }
+
+    SalesReturnListItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        returnNumber: { type: string, example: RET-000001 }
+        orderId: { type: string, format: uuid }
+        orderNumber: { type: string, example: SO-000001 }
+        customerName: { type: string, nullable: true }
+        status: { type: string, enum: [PENDING, COMPLETED, REJECTED] }
+        reason: { type: string }
+        subtotal: { type: string, example: '50.00' }
+        taxAmount: { type: string, example: '0.00' }
+        totalAmount: { type: string, example: '50.00' }
+        itemCount: { type: integer }
+        processedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+
+    SalesReturnDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        returnNumber: { type: string, example: RET-000001 }
+        orderId: { type: string, format: uuid }
+        orderNumber: { type: string, example: SO-000001 }
+        status: { type: string, enum: [PENDING, COMPLETED, REJECTED] }
+        reason: { type: string }
+        notes: { type: string, nullable: true }
+        subtotal: { type: string, example: '50.00' }
+        taxAmount: { type: string, example: '0.00' }
+        totalAmount: { type: string, example: '50.00' }
+        rejectionReason: { type: string, nullable: true }
+        idempotencyKey: { type: string, nullable: true }
+        processedAt: { type: string, format: date-time, nullable: true }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        order: { type: object }
+        requestedBy: { $ref: '#/components/schemas/User' }
+        processedBy: { $ref: '#/components/schemas/User' }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/SalesReturnItem' }
+        refunds:
+          type: array
+          items: { type: object }
+        inventoryMovements:
+          type: array
+          items: { type: object }
+
+    CreateSalesReturnInput:
+      type: object
+      required: [orderId, reason, items]
+      properties:
+        orderId: { type: string, format: uuid }
+        reason: { type: string, minLength: 1, maxLength: 500 }
+        notes: { type: string, maxLength: 2000, nullable: true }
+        items:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [orderItemId, quantity, condition]
+            properties:
+              orderItemId: { type: string, format: uuid }
+              quantity: { type: integer, minimum: 1 }
+              condition: { type: string, enum: [RESALABLE, DAMAGED] }
+
+    CompleteSalesReturnInput:
+      type: object
+      properties:
+        notes: { type: string, maxLength: 2000, nullable: true }
+
+    RejectSalesReturnInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500 }
+
+    RefundSalesReturnInput:
+      type: object
+      required: [paymentMethodId]
+      properties:
+        paymentMethodId: { type: string, format: uuid }
+        amount: { type: string, example: '50.00' }
+        paidAt: { type: string, format: date-time }
+        reference: { type: string, maxLength: 100 }
+        notes: { type: string, maxLength: 2000 }
+
+    SalesSummaryReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            range: { type: object }
+            totals: { type: object }
+            byPeriod: { type: array, items: { type: object } }
+            ordersByStatus: { type: object }
+
+    SalesByProductReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            range: { type: object }
+            data: { type: array, items: { type: object } }
+            meta: { $ref: '#/components/schemas/PageMeta' }
+
+    SalesByCustomerReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            range: { type: object }
+            data: { type: array, items: { type: object } }
+            meta: { $ref: '#/components/schemas/PageMeta' }
+
+    PurchasesReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            range: { type: object }
+            summary: { type: object }
+            bySupplier: { type: array, items: { type: object } }
+            purchases: { type: object }
+
+    InventorySummaryReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            range: { type: object }
+            statusCounts: { type: object }
+            movementsSummary: { type: array, items: { type: object } }
+            lowStockItems: { type: array, items: { type: object } }
+
+    InventoryValuationReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            totalValuation: { type: string }
+            totalQuantity: { type: integer }
+            totalItems: { type: integer }
+            byCategory: { type: array, items: { type: object } }
+            items: { type: object }
+
+    FinancialSummaryReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            range: { type: object }
+            revenue: { type: object }
+            costs: { type: object }
+            cashFlow: { type: object }
+            balances: { type: object }
+
+    FinancialAgingReport:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            asOf: { type: string, format: date }
+            customers: { type: object }
+            suppliers: { type: object }
+
+    AuditLogItem:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        action: { type: string, example: order.confirmed }
+        entityType: { type: string, example: order }
+        entityId: { type: string, nullable: true }
+        metadata: { type: object, nullable: true }
+        ipAddress: { type: string, nullable: true }
+        userAgent: { type: string, nullable: true }
+        requestId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        actor: { $ref: '#/components/schemas/User' }
+
+    BusinessSettingsDetail:
+      type: object
+      properties:
+        id: { type: integer }
+        businessName: { type: string }
+        legalName: { type: string, nullable: true }
+        taxRegistrationNumber: { type: string, nullable: true }
+        email: { type: string, nullable: true }
+        phone: { type: string, nullable: true }
+        address: { type: string, nullable: true }
+        logoPath: { type: string, nullable: true }
+        currencyCode: { type: string, example: USD }
+        locale: { type: string, example: en-US }
+        timezone: { type: string, example: UTC }
+        taxEnabled: { type: boolean }
+        taxLabel: { type: string }
+        defaultTaxRate: { type: string }
+        invoiceFooter: { type: string, nullable: true }
+        defaultLowStockThreshold: { type: integer }
+        lowStockAlertsEnabled: { type: boolean }
+        allowSelfRegistration: { type: boolean }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { $ref: '#/components/schemas/User' }
+
+    DocumentSequenceDetail:
+      type: object
+      properties:
+        documentType: { type: string, enum: [ORDER, INVOICE, PURCHASE, PURCHASE_RECEIPT, PAYMENT, SALES_RETURN] }
+        prefix: { type: string }
+        nextNumber: { type: integer }
+        padding: { type: integer }
+        updatedAt: { type: string, format: date-time }
+
+    PaymentMethodDetail:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        code: { type: string }
+        name: { type: string }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    FullSettingsResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            settings: { $ref: '#/components/schemas/BusinessSettingsDetail' }
+            documentSequences:
+              type: array
+              items: { $ref: '#/components/schemas/DocumentSequenceDetail' }
+            paymentMethods:
+              type: array
+              items: { $ref: '#/components/schemas/PaymentMethodDetail' }
+
+    UpdateSettingsInput:
+      type: object
+      properties:
+        businessName: { type: string, minLength: 1, maxLength: 150 }
+        legalName: { type: string, maxLength: 150, nullable: true }
+        taxRegistrationNumber: { type: string, maxLength: 50, nullable: true }
+        email: { type: string, format: email, maxLength: 254, nullable: true }
+        phone: { type: string, maxLength: 30, nullable: true }
+        address: { type: string, maxLength: 2000, nullable: true }
+        logoPath: { type: string, maxLength: 255, nullable: true }
+        currencyCode: { type: string, pattern: '^[A-Z]{3}$' }
+        locale: { type: string, maxLength: 20 }
+        timezone: { type: string, maxLength: 64 }
+        taxEnabled: { type: boolean }
+        taxLabel: { type: string, minLength: 1, maxLength: 30 }
+        defaultTaxRate: { type: string }
+        invoiceFooter: { type: string, maxLength: 2000, nullable: true }
+        defaultLowStockThreshold: { type: integer, minimum: 0 }
+        lowStockAlertsEnabled: { type: boolean }
+        allowSelfRegistration: { type: boolean }
+
+    UpdateSequenceInput:
+      type: object
+      properties:
+        prefix: { type: string, minLength: 1, maxLength: 10 }
+        padding: { type: integer, minimum: 1, maximum: 12 }
+
+    UpdatePaymentMethodInput:
+      type: object
+      properties:
+        name: { type: string, minLength: 1, maxLength: 50 }
+        isActive: { type: boolean }
+        sortOrder: { type: integer }
+
   responses:
     ValidationError:
       description: Request validation failed
@@ -3166,6 +4052,12 @@ components:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
           example: { error: { code: DUPLICATE, message: An account with this email already exists, requestId: 3f1c… } }
+    Conflict:
+      description: Conflict with current resource state or reused idempotency key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: { code: INVALID_STATE_TRANSITION, message: Conflict with current state, requestId: 3f1c… } }
     RateLimited:
       description: Too many requests
       content:

@@ -184,5 +184,25 @@ The Next.js server stores both tokens in HttpOnly cookies and performs refreshes
 | GET | `/payments` | ✔ | `payments.read` | Paginated payment ledger with filters (orderId, purchaseId, method, type, date range) |
 | GET | `/payments/:id` | ✔ | `payments.read` | Payment detail |
 | POST | `/payments/:id/reverse` | ✔ | `payments.reverse` | Voids payment/refund by recording append-only REVERSAL row with mandatory reason; adjusts document balance; requires `Idempotency-Key` |
+| GET | `/sales-returns` | ✔ | `returns.read` | Paginated sales returns; filter by `orderId`, `customerId`, `status`, date range; search number/reason/customer |
+| POST | `/sales-returns` | ✔ | `returns.create` | Request return against DELIVERED/COMPLETED order; checks returnable qty (BR-RET-02); requires `Idempotency-Key` |
+| GET | `/sales-returns/:id` | ✔ | `returns.read` | Sales return detail with items, refunds, and movements |
+| POST | `/sales-returns/:id/complete` | ✔ | `returns.process` | Completes return: restocks RESALABLE items (`SALE_RETURN`), skips DAMAGED, updates order `returnedAmount` and `paymentStatus` |
+| POST | `/sales-returns/:id/reject` | ✔ | `returns.process` | Rejects return request with mandatory reason |
+| POST | `/sales-returns/:id/refund` | ✔ | `payments.refund` | Issues REFUND payment linked to completed sales return (`salesReturnId`); requires `Idempotency-Key` |
+| GET | `/reports/sales/summary` | ✔ | `reports.sales` | Gross sales, discounts, returns, net sales, tax, periodic breakdown, and orders by status |
+| GET | `/reports/sales/by-product` | ✔ | `reports.sales` | Qty sold/returned and sales per product; COGS and margin gated by `products.view_cost` |
+| GET | `/reports/sales/by-customer` | ✔ | `reports.sales` | Customer orders, net sales, paid amount, and outstanding balance |
+| GET | `/reports/purchases` | ✔ | `reports.purchases` | Ordered value, received value, paid amount, supplier breakdown, and purchase list |
+| GET | `/reports/inventory/summary` | ✔ | `reports.inventory` | Stock status counts, movement history totals by type, and low-stock items |
+| GET | `/reports/inventory/valuation` | ✔ | `reports.inventory` + `products.view_cost` | WAC inventory valuation overall, by category, and per product |
+| GET | `/reports/financial/summary` | ✔ | `reports.financial` | Net sales revenue, COGS, estimated gross profit, cash flow by method, and outstanding balances |
+| GET | `/reports/financial/aging` | ✔ | `reports.financial` | Outstanding customer and supplier balances aged by document date (0–30, 31–60, 61–90, 90+ days) |
+| GET | `/audit-logs` | ✔ | `audit_logs.read` | Paginated audit logs with search and filters (`actorId`, `action`, `entityType`, `entityId`, date range) |
+| GET | `/audit-logs/:id` | ✔ | `audit_logs.read` | Audit log entry detail |
+| GET | `/settings` | ✔ | – | Business settings singleton, document sequences, and payment methods |
+| PATCH / PUT | `/settings` | ✔ | `settings.update` | Update business profile, tax, currency (blocked once transactions exist), low-stock threshold, self-registration |
+| PATCH | `/settings/sequences/:documentType` | ✔ | `settings.update` | Update document sequence prefix and padding |
+| PATCH | `/settings/payment-methods/:id` | ✔ | `settings.update` | Update payment method name, active status, and sort order |
 
 Further modules are designed and added here (and to `openapi.yaml`) as each phase implements them.

@@ -12,7 +12,7 @@ _Last updated: 2026-11-10_
 | 3 · Core business modules | ✅ Approved & merged 2026-11-09 | Users, roles, categories, products (+ images), suppliers, customers, dashboard foundation |
 | 4 · Purchase & inventory | ✅ Approved & merged 2026-11-09 | Purchases, goods receipts, inventory management & adjustments, movements |
 | 5 · Orders & payments | ✅ Approved & merged 2026-11-10 | Orders, invoices, payments, refunds, balances |
-| 6 · Returns, reports, audit, settings | ⏳ | |
+| 6 · Returns, reports, audit, settings | ✅ Complete (pending review) 2026-11-10 | Sales returns, reports & analytics, audit log API, business settings API, tests, OpenAPI docs |
 | 7 · Frontend | ⏳ | |
 | 8 · Testing & hardening | ⏳ | |
 | 9 · Deployment preparation | ⏳ | |
@@ -33,21 +33,17 @@ _Last updated: 2026-11-10_
 | Inventory | ✅ | ✅ overview with stock state & cost privacy gating, low-stock query, manual adjustments (`ADJUSTMENT_IN`/`OUT`), movement history & details | – | ✅ |
 | Orders & invoices | ✅ | ✅ CRUD, calculations, confirmation (stock deduction), cancellation, shipping, delivery, completion, printable invoice | – | ✅ |
 | Payments | ✅ | ✅ ledger, payments on orders, refunds, reversals, idempotency replay, balance updates | – | ✅ |
-| Sales returns | ✅ | – | – | – |
-| Reports | ✅ | – | – | – |
-| Audit logs | ✅ | 🟡 recorder + immutability; read API in Phase 6 | – | 🟡 |
-| Business settings | ✅ | 🟡 seeded row; API in Phase 6 | – | – |
+| Sales returns | ✅ | ✅ requests against delivered/completed orders, qty validation, RESALABLE restock (`SALE_RETURN`), return-linked refunds (`salesReturnId`), rejection | – | ✅ |
+| Reports | ✅ | ✅ sales (summary, by product w/ cost gating, by customer), purchases, inventory (summary, WAC valuation), financial (summary, AR/AP aging) | – | ✅ |
+| Audit logs | ✅ | ✅ paginated search/filter (`actorId`, `action`, `entityType`, `entityId`, date range), detail endpoint, immutable ledger | – | ✅ |
+| Business settings | ✅ | ✅ singleton `GET`/`PATCH`/`PUT`, currency lock after transactions, sequence prefix/padding, payment method config | – | ✅ |
 
 ## Next steps (handoff — start here)
 
 Any agent/developer continuing the work: read `AGENTS.md` first, then:
 
-1. Create branch `phase-6/returns-reports-audit-settings` for Phase 6.
-2. Implement Sales returns: return authorization, return receipt (stock restoration), credit note, order refund link.
-3. Implement Reports module: inventory valuation, low stock, stock movement ledger, sales summary, payment summary.
-4. Implement Audit log read API and business settings management API.
-5. Integration tests, OpenAPI & API_DESIGN update, check lint + typecheck + tests.
-6. Owner review of Phase 6, merge to `main`.
+1. Owner review of Phase 6 on `phase-6/returns-reports-audit-settings` and fast-forward merge into `main`.
+2. Start Phase 7: Next.js 15 Frontend (BFF HttpOnly cookie auth, SSR data fetching, inventory, purchasing, orders, payments, returns, reports, audit logs, settings).
 
 ## Phase 2 deliverables
 
@@ -76,7 +72,7 @@ Any agent/developer continuing the work: read `AGENTS.md` first, then:
 | Branch | Content |
 |--------|---------|
 | `main` | Phase 0–5 complete |
-| `phase-6/returns-reports-audit-settings` | Phase 6 (next) |
+| `phase-6/returns-reports-audit-settings` | Phase 6 complete (ready for review) |
 
 Commits are made per completed task (docs, scaffold, foundation/auth, tests, docs/CI).
 
@@ -92,7 +88,7 @@ Commits are made per completed task (docs, scaffold, foundation/auth, tests, doc
 | Suite | Tests | Result |
 |-------|-------|--------|
 | Unit | 58 | ✅ |
-| Integration (PostgreSQL 16) | 135 | ✅ (Phase 1–5: 193 total across unit + integration) |
+| Integration (PostgreSQL 16) | 157 | ✅ (Phase 1–6: 215 total across 26 files) |
 | DB constraint checks (Phase 1, manual SQL) | 22 | ✅ |
 | E2E | – | Phase 8 |
 
