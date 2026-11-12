@@ -32,49 +32,52 @@ const PAYMENT_METHODS = [
  * - Settings, sequences and payment methods are created only if missing.
  */
 export async function seedBase(prisma: PrismaClient): Promise<void> {
-  await prisma.$transaction(async (tx) => {
-    for (const [key, p] of Object.entries(PERMISSIONS)) {
-      await tx.permission.upsert({
-        where: { key },
-        create: { key, module: p.module, description: p.description },
-        update: { module: p.module, description: p.description },
-      });
-    }
-    await tx.permission.deleteMany({ where: { key: { notIn: ALL_PERMISSIONS } } });
-
-    for (const name of Object.values(SystemRole)) {
-      const existing = await tx.role.findUnique({ where: { name } });
-      const role =
-        existing ??
-        (await tx.role.create({ data: { name, description: ROLE_DESCRIPTIONS[name], isSystem: true } }));
-      if (!existing || name === SystemRole.ADMIN) {
-        await tx.rolePermission.createMany({
-          data: DEFAULT_ROLE_PERMISSIONS[name].map((permissionKey) => ({ roleId: role.id, permissionKey })),
-          skipDuplicates: true,
+  await prisma.$transaction(
+    async (tx) => {
+      for (const [key, p] of Object.entries(PERMISSIONS)) {
+        await tx.permission.upsert({
+          where: { key },
+          create: { key, module: p.module, description: p.description },
+          update: { module: p.module, description: p.description },
         });
       }
-    }
+      await tx.permission.deleteMany({ where: { key: { notIn: ALL_PERMISSIONS } } });
 
-    await tx.businessSetting.upsert({
-      where: { id: 1 },
-      create: { id: 1, businessName: 'My Business' },
-      update: {},
-    });
+      for (const name of Object.values(SystemRole)) {
+        const existing = await tx.role.findUnique({ where: { name } });
+        const role =
+          existing ??
+          (await tx.role.create({ data: { name, description: ROLE_DESCRIPTIONS[name], isSystem: true } }));
+        if (!existing || name === SystemRole.ADMIN) {
+          await tx.rolePermission.createMany({
+            data: DEFAULT_ROLE_PERMISSIONS[name].map((permissionKey) => ({ roleId: role.id, permissionKey })),
+            skipDuplicates: true,
+          });
+        }
+      }
 
-    for (const documentType of Object.values(DocumentType)) {
-      await tx.documentSequence.upsert({
-        where: { documentType },
-        create: { documentType, prefix: DOCUMENT_PREFIXES[documentType] },
+      await tx.businessSetting.upsert({
+        where: { id: 1 },
+        create: { id: 1, businessName: 'My Business' },
         update: {},
       });
-    }
 
-    for (const [i, m] of PAYMENT_METHODS.entries()) {
-      await tx.paymentMethod.upsert({
-        where: { code: m.code },
-        create: { ...m, sortOrder: i },
-        update: {},
-      });
-    }
-  });
+      for (const documentType of Object.values(DocumentType)) {
+        await tx.documentSequence.upsert({
+          where: { documentType },
+          create: { documentType, prefix: DOCUMENT_PREFIXES[documentType] },
+          update: {},
+        });
+      }
+
+      for (const [i, m] of PAYMENT_METHODS.entries()) {
+        await tx.paymentMethod.upsert({
+          where: { code: m.code },
+          create: { ...m, sortOrder: i },
+          update: {},
+        });
+      }
+    },
+    { maxWait: 10_000, timeout: 60_000 },
+  );
 }
