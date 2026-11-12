@@ -64,7 +64,7 @@ paths:
           description: Process is up
           content:
             application/json:
-              example: { status: ok, uptimeSeconds: 42 }
+              example: { status: ok }
 
   /health/ready:
     get:

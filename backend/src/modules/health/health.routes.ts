@@ -5,7 +5,7 @@ export const healthRouter = Router();
 
 /** Liveness: the process is up and serving requests. */
 healthRouter.get('/live', (_req, res) => {
-  res.json({ status: 'ok', uptimeSeconds: Math.round(process.uptime()) });
+  res.json({ status: 'ok' });
 });
 
 /** Readiness: dependencies (database) are reachable. */
